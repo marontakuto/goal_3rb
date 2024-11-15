@@ -1,4 +1,4 @@
-# multi_avoidance
+# goal_3rb
 
 Gazeboで群ロボットの回避行動の獲得を実現するためのリポジトリです。
 
