@@ -154,9 +154,19 @@ class Env():
 
             if self.display_image:
                 disp_img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR) # 標準フォーマットBGR
+
+                # アスペクト比を維持してリサイズ
+                height, width = disp_img.shape[:2]
+                target_width, target_height = 480, 270
+                scale = min(target_width / width, target_height / height)
+                new_width = int(width * scale)
+                new_height = int(height * scale)
+                disp_img = cv2.resize(disp_img, (new_width, new_height))
+
+                # ウィンドウを表示
                 cv2.namedWindow('camera', cv2.WINDOW_NORMAL)
-                cv2.resizeWindow('camera', 480, 270) # 480×270[pixel]のウィンドウで表示
-                cv2.imshow('camera', disp_img) # 表示
+                cv2.resizeWindow('camera', target_width, target_height)
+                cv2.imshow('camera', disp_img)
                 cv2.waitKey(1)
             
             self.img = img
@@ -196,6 +206,7 @@ class Env():
             img = img[:, len(img[0]) * 0 // 9:len(img[0]) * 9 // 9]
         if side:
             img = np.hstack((img[:, :len(img[1]) * 1 // 5], img[:, len(img[1]) * 4 // 5:]))
+        
         img_hsv = cv2.cvtColor(img, cv2.COLOR_RGB2HSV)
         outside = cv2.inRange(img_hsv, outside_lower, outside_upper)
         inside = cv2.inRange(img_hsv, inside_lower, inside_upper)
@@ -210,9 +221,19 @@ class Env():
         if self.display_image:
             disp_img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR) # 標準フォーマットBGR
             disp_img = np.hstack((disp_img[:, :len(img[1]) * 1 // 5], disp_img[:, len(img[1]) * 4 // 5:]))
-            cv2.namedWindow('img', cv2.WINDOW_NORMAL)
-            cv2.resizeWindow('img', 480, 270)
-            cv2.imshow('img', disp_img)
+
+            # アスペクト比を維持してリサイズ
+            height, width = disp_img.shape[:2]
+            target_width, target_height = 480, 270
+            scale = min(target_width / width, target_height / height)
+            new_width = int(width * scale)
+            new_height = int(height * scale)
+            disp_img = cv2.resize(disp_img, (new_width, new_height))
+
+            # ウィンドウを表示
+            cv2.namedWindow('camera', cv2.WINDOW_NORMAL)
+            cv2.resizeWindow('camera', target_width, target_height)
+            cv2.imshow('camera', disp_img)
             cv2.waitKey(1)
         
         return outside_num, inside_num, robot_blue_num, robot_green_num
@@ -706,7 +727,7 @@ class Env():
         
         if terms == 'hard' and (judge_list[0] and judge_list[1]): # 他の全ロボットがエリアに存在する時
             exist = True
-        elif terms == 'hsoft' and (judge_list[0] or judge_list[1]): # 他のロボットが1台でもエリアに存在する時
+        elif terms == 'soft' and (judge_list[0] or judge_list[1]): # 他のロボットが1台でもエリアに存在する時
             exist = True
 
         return exist
@@ -736,7 +757,8 @@ class Env():
         probabilistic = True # True: リカバリー方策を確率的に利用する, False: リカバリー方策を必ず利用する
         initial_probability = 1.0 # 最初の確率
         finish_episode = 15 # 方策を適応する最後のエピソード
-        ##############################
+        mode_change_episode = 11 # 行動変更のトリガーをLiDAR値からQ値に変えるエピソード 
+        ############################
 
         # リカバリー方策の利用判定
         if not probabilistic: # 必ず利用
@@ -773,25 +795,40 @@ class Env():
         
         # 行動を変更
         if change_action:
-            net_out = model.forward(state.unsqueeze(0).to('cuda:0')) # ネットワークの出力
-            q_values = net_out.q_values.cpu().detach().numpy().tolist()[0] # Q値
-
-            if len(bad_action) == 3: # 全方向のLiDAR値が低い場合はLiDAR値が最大の方向へ
-                front = input_scan[0:10] + input_scan[27:36] # left~forward~rightまで
-                max_index = input_scan.index(max(front)) # left~forward~rightまでで最大の値の要素番号
-                if max_index in left: # left方向が空いている場合は左折
-                    action = 0
-                elif max_index in forward: # forward方向が空いている場合は直進
-                    action = 1
-                elif max_index in right: # right方向が空いている場合は右折
-                    action = 2
-            elif len(bad_action) == 2: # 2方向のLiDAR値が低い場合は残りの方向へ
-                action = (set([0, 1, 2]) - set(bad_action)).pop()
-            elif len(bad_action) == 1: # 1方向のLiDAR値が低い場合はQ値が大きい方向へ
-                action_candidate = list(set([0, 1, 2]) - set(bad_action))
-                if q_values[action_candidate[0]] > q_values[action_candidate[1]]:
-                    action = action_candidate[0]
-                else:
-                    action = action_candidate[1]
+            if e < mode_change_episode: # LiDAR値による行動の変更
+                # 各方向のLiDAR値
+                front_scan = input_scan[0:left[-1] + 1] + input_scan[right[0]:lidar_num]
+                left_scan = input_scan[left[0]:left[-1] + 1]
+                forward_scan = input_scan[0:left[0]] + input_scan[right[-1] + 1:lidar_num]
+                right_scan = input_scan[right[0]:right[-1] + 1]
+                scan_list = [left_scan, forward_scan, right_scan]
+                if len(bad_action) == 3: # 全方向のLiDAR値が低い場合はLiDAR値が最大の方向へ
+                    if max(front_scan) in left_scan: # left方向が空いている場合は左折
+                        action = 0
+                    elif max(front_scan) in forward_scan: # forward方向が空いている場合は直進
+                        action = 1
+                    elif max(front_scan) in right_scan: # right方向が空いている場合は右折
+                        action = 2
+                elif len(bad_action) == 2: # 2方向のLiDAR値が低い場合は残りの方向へ
+                    action = (set([0, 1, 2]) - set(bad_action)).pop()
+                elif len(bad_action) == 1: # 1方向のLiDAR値が低い場合は残りのLiDAR値が大きい方向へ
+                    action_candidate = list(set([0, 1, 2]) - set(bad_action))
+                    if max(scan_list[action_candidate[0]]) > max(scan_list[action_candidate[1]]):
+                        action = action_candidate[0]
+                    else:
+                        action = action_candidate[1]
+            else: # Q値による行動の変更
+                net_out = model.forward(state.unsqueeze(0).to('cuda:0')) # ネットワークの出力
+                q_values = net_out.q_values.cpu().detach().numpy().tolist()[0] # Q値
+                if len(bad_action) == 3: # 全方向のLiDAR値が低い場合はQ値が最大の方向へ
+                    action = q_values.index(max(q_values))
+                elif len(bad_action) == 2: # 2方向のLiDAR値が低い場合は残りの方向へ
+                    action = (set([0, 1, 2]) - set(bad_action)).pop()
+                elif len(bad_action) == 1: # 1方向のLiDAR値が低い場合は残りのQ値が大きい方向へ
+                    action_candidate = list(set([0, 1, 2]) - set(bad_action))
+                    if q_values[action_candidate[0]] > q_values[action_candidate[1]]:
+                        action = action_candidate[0]
+                    else:
+                        action = action_candidate[1]
 
         return action

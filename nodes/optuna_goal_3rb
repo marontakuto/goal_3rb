@@ -439,10 +439,10 @@ def main(trial):
     visual = Visual()
     visual.v1(trial)
     
-    # パラメータファイルの削除(トライアルが多い場合は必須)
+    # パラメータファイルの削除(トライアル数が多い場合は必須)
     dirPath = os.path.dirname(os.path.realpath(__file__))
-    dirPath = dirPath.replace('/nodes', '/save_model')
-    shutil.rmtree(dirPath + '/' + 'TRIAL' + str(len(study.trials) - 1) + '/')
+    dirPath = dirPath.replace('/nodes', '/save_model/TRIAL' + str(len(study.trials) - 1) + '/')
+    shutil.rmtree(dirPath)
 
     return round(score_list_ave, 2)
 

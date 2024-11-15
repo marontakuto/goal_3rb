@@ -182,16 +182,16 @@ class ReinforceAgent():
                 end_epsilon = 0.0,
                 decay_steps = self.episode*self.episode_step,
                 random_action_func=lambda: np.random.randint(self.action_size),
-                # replay_start_size = 0,
-                replay_start_size = self.replay_start_size,
+                # replay_start_size = 0, # 初期探索なし
+                replay_start_size = self.replay_start_size, # 初期探索あり
                 action_size = self.action_size
             )
         elif self.exploration == 'c_egreedy': # εが一定
             self.explorer = greedy_goal_3rb.MyConstantGreedy(
                 epsilon=0, # 0ならgreedy
                 random_action_func=lambda: np.random.randint(self.action_size),
-                # replay_start_size = 0,
-                replay_start_size = self.replay_start_size, # 初期探索を行う場合
+                # replay_start_size = 0, # 初期探索なし
+                replay_start_size = self.replay_start_size, # 初期探索あり
                 action_size = self.action_size
             )
             
@@ -308,11 +308,11 @@ class ReinforceAgent():
             
             # モデルの保存
             if self.save_model and e >= self.save_episode:
-                self.model.save(self.dirPath + '/' + 'TRIAL' + str(trials) + '/episode' + str(e) + '/robot_' + str(self.robot_n))
-                self.rbuf.save(self.dirPath + '/' + 'TRIAL' + str(trials) + '/episode' + str(e) + '/robot_' + str(self.robot_n) + '/replay_buffer')
+                self.model.save(self.dirPath + '/TRIAL' + str(trials) + '/episode' + str(e) + '/robot_' + str(self.robot_n))
+                self.rbuf.save(self.dirPath + '/TRIAL' + str(trials) + '/episode' + str(e) + '/robot_' + str(self.robot_n) + '/replay_buffer')
             else:
-                self.model.save(self.dirPath + '/' + 'TRIAL' + str(trials) + '/episode' + str(e) + '/robot_' + str(self.robot_n))
-                # self.rbuf.save(self.dirPath + '/' + 'TRIAL' + str(trials) + '/episode' + str(e) + '/robot_' + str(self.robot_n) + '/replay_buffer')
+                self.model.save(self.dirPath + '/TRIAL' + str(trials) + '/episode' + str(e) + '/robot_' + str(self.robot_n))
+                # self.rbuf.save(self.dirPath + '/TRIAL' + str(trials) + '/episode' + str(e) + '/robot_' + str(self.robot_n) + '/replay_buffer')
             
             # エピソードごとの同期(他ロボットが右のエリアにいることを確認することで同期を取る)
             if self.synchro and e != self.episode:
@@ -320,7 +320,7 @@ class ReinforceAgent():
                 sync = False
                 while sync == False:
                     sync = env.area_judge(terms='hard', area='right')
-                time.sleep(0.1)
+                time.sleep(0.5)
                 env.set_robot(0) # 初期位置に配置
 
             # 学習中に強制終了の処置がされた場合
@@ -342,7 +342,7 @@ class ReinforceAgent():
             sync = False
             while sync == False:
                 sync = env.area_judge(terms='hard', area='left')
-            time.sleep(0.1)
+            time.sleep(0.5)
         
         # テストに用いるエピソードモデルの選択
         if e <= 2:
@@ -371,7 +371,7 @@ class ReinforceAgent():
         if test_e == 999: # 指定されたモデルのロード
             self.model.load(self.dirPath + '/load_model/robot_' + str(self.robot_n))
         else: # 学習の内指定されたエピソードのロード
-            self.model.load(self.dirPath + '/' + 'TRIAL' + str(trials) + '/episode' + str(test_e) + '/robot_' + str(self.robot_n))
+            self.model.load(self.dirPath + '/TRIAL' + str(trials) + '/episode' + str(test_e) + '/robot_' + str(self.robot_n))
 
         with self.model.eval_mode():
             for eval_e in range(1, self.eval_episode + 1):
@@ -466,7 +466,7 @@ class ReinforceAgent():
                             sync = False
                             while sync == False:
                                 sync = env.area_judge(terms='hard', area='upper')
-                            time.sleep(0.1)
+                            time.sleep(0.5)
                         
                         break
         
@@ -494,7 +494,7 @@ class ReinforceAgent():
         self.excel(data, columns, f_evaluate_name)
 
         # テストに用いたモデルをdirPath2に保存
-        self.model.save(self.dirPath2 + '/' + 'TRIAL' + str(trials) + '/episode' + str(test_e) + '/robot_' + str(self.robot_n))
+        self.model.save(self.dirPath2 + '/TRIAL' + str(trials) + '/episode' + str(test_e) + '/robot_' + str(self.robot_n))
 
         return score
 
