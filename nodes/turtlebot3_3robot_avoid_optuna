@@ -1,0 +1,542 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+""" それぞれがDQNを保有する群ロボットの回避行動の獲得 """
+
+from __future__ import division
+import pfrl
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+
+from pfrl import action_value
+from pfrl.initializers import init_chainer_default
+from pfrl.nn.mlp import MLP
+from pfrl.q_function import StateQFunction
+
+import matplotlib.pyplot as plt
+import numpy as np
+import cv2
+
+import rospy
+from std_msgs.msg import Float32MultiArray, Int32MultiArray, Float32, Int32
+import os
+import my_explorer
+import time
+import sys
+import optuna
+from datetime import datetime
+sys.path.append(os.path.dirname(os.path.abspath(os.path.dirname(__file__))))
+import shutil
+import optuna.samplers._tpe.sampler as TPE_file
+from optuna.samplers import TPESampler
+from optuna.trial import TrialState
+
+
+class Main():
+    def __init__(self, trial):
+
+        print('\ntrial ' + str(len(study.trials) - 1) + ' start')
+
+        self.network='DCNN' # CNN or DCNN or MLP
+
+        if self.network == 'CNN':
+            if Target=='both' or Target=='network':
+                #畳み込み層,プーリング層の組み合わせを選択
+                self.conv_num = trial.suggest_categorical('conv_num', [1,2,3])
+
+                # 中間層数とユニット数の選択
+                self.mid_layer_num = trial.suggest_categorical('mid_layer_num', [1,2,3])
+                if self.mid_layer_num == 1:
+                    self.mid_units1 = int(trial.suggest_float("mid_units1", 50, 800, step=50))
+                    self.mid_units2 = None
+                    self.mid_units3 = None
+                elif self.mid_layer_num == 2:
+                    self.mid_units1 = int(trial.suggest_float("mid_units1", 400, 800, step=50))
+                    self.mid_units2 = int(trial.suggest_float("mid_units2", 50, 600, step=50))
+                    self.mid_units3 = None
+                elif self.mid_layer_num == 3:
+                    self.mid_units1 = int(trial.suggest_float("mid_units1", 400, 800, step=50))
+                    self.mid_units3 = int(trial.suggest_float("mid_units3", 400, 800, step=50))
+                    self.mid_units2 = int(trial.suggest_float("mid_units2", 50, 500, step=50))
+            else:
+                self.conv_num = None
+                self.mid_layer_num = None
+                self.mid_units1 = None
+                self.mid_units2 = None
+                self.mid_units3 = None
+        
+        if self.network == 'DCNN':
+            if Target=='both' or Target=='network':
+                #畳み込み層,プーリング層の組み合わせを選択
+                self.conv_num = trial.suggest_categorical('conv_num', [1, 2, 3])
+
+                # 中間層数とユニット数の選択
+                self.mid_layer_num = trial.suggest_categorical('mid_layer_num', [1, 2, 3])
+                if self.mid_layer_num == 1:
+                    self.mid_units1 = int(trial.suggest_float("mid_units1", 50, 800, step=1))
+                    self.mid_units2 = None
+                    self.mid_units3 = None
+                elif self.mid_layer_num == 2:
+                    self.mid_units1 = int(trial.suggest_float("mid_units1", 300, 800, step=1))
+                    self.mid_units2 = int(trial.suggest_float("mid_units2", 50, 600, step=1))
+                    self.mid_units3 = None
+                elif self.mid_layer_num == 3:
+                    self.mid_units1 = int(trial.suggest_float("mid_units1", 300, 800, step=1))
+                    self.mid_units3 = int(trial.suggest_float("mid_units3", 300, 800, step=1))
+                    self.mid_units2 = int(trial.suggest_float("mid_units2", 50, 500, step=1))
+            else:
+                self.conv_num = None
+                self.mid_layer_num = None
+                self.mid_units1 = None
+                self.mid_units2 = None
+                self.mid_units3 = None
+
+        if self.network == 'MLP':
+            if Target=='both' or Target=='network':
+                self.conv_num = None
+                # 中間層数とユニット数の選択
+                self.mid_layer_num = trial.suggest_categorical('mid_layer_num', [1,2,3])
+                if self.mid_layer_num == 1:
+                    self.mid_units1 = int(trial.suggest_float("mid_units1", 50, 850, step=100))
+                    self.mid_units2 = None
+                    self.mid_units3 = None
+                elif self.mid_layer_num == 2:
+                    self.mid_units1 = int(trial.suggest_float("mid_units1", 400, 800, step=100))
+                    self.mid_units2 = int(trial.suggest_float("mid_units2", 50, 650, step=100))
+                    self.mid_units3 = None
+                elif self.mid_layer_num == 3:
+                    self.mid_units1 = int(trial.suggest_float("mid_units1", 400, 800, step=100))
+                    self.mid_units3 = int(trial.suggest_float("mid_units3", 400, 800, step=100))
+                    self.mid_units2 = int(trial.suggest_float("mid_units2", 50, 850, step=100))
+            else:
+                self.conv_num = None
+                self.mid_layer_num = None
+                self.mid_units1 = None
+                self.mid_units2 = None
+                self.mid_units3 = None
+
+        # fully-connected layerとconvolutionの活性化関数の選択
+        if Target == 'both' or Target == 'network':
+            if self.network == 'CNN' or self.network == 'DCNN':
+                # cnv_act_name = trial.suggest_categorical('activation_cnv', ['relu','elu','selu','l_relu'])
+                cnv_act_name = 'relu'
+            # ful_act_name = trial.suggest_categorical('activation_ful', ['relu','elu','selu','l_relu'])
+            ful_act_name = 'relu'
+
+            if cnv_act_name == 'relu':
+                self.cnv_act = 0
+            elif cnv_act_name == 'elu':
+                self.cnv_act = 1
+            elif cnv_act_name == 'selu':
+                self.cnv_act = 2
+            elif cnv_act_name == 'l_relu':
+                self.cnv_act = 3
+            
+            if ful_act_name == 'relu':
+                self.ful_act = 0
+            elif ful_act_name == 'elu':
+                self.ful_act = 1
+            elif ful_act_name == 'selu':
+                self.ful_act = 2
+            elif ful_act_name == 'l_relu':
+                self.ful_act = 3
+        else:
+            self.cnv_act = None
+            self.ful_act = None
+
+        # 最適化アルゴリズムの選択
+        if Target == 'both' or Target == 'network':
+            # optimizer_names = ['RAdam', 'Adagrad', 'Adadelta', 'RMSprop']
+            # optimizer = trial.suggest_categorical('optimizer', optimizer_names)
+            optimizer = 'RAdam'
+        else:
+            optimizer = 'RAdam'
+        
+        if optimizer == 'SGD':
+            self.optimizer = 0
+        elif optimizer == 'MomentumSGD':
+            self.optimizer = 1
+        elif optimizer == 'Adagrad':
+            self.optimizer = 2
+        elif optimizer == 'RMSprop':
+            self.optimizer = 3
+        elif optimizer == 'Adadelta':
+            self.optimizer = 4
+        elif optimizer == 'Adam':
+            self.optimizer = 5
+        elif optimizer == 'AdamW':
+            self.optimizer = 6
+        elif optimizer == 'SparseAdam':
+            self.optimizer = 7
+        elif optimizer == 'Adamax':
+            self.optimizer = 8
+        elif optimizer == 'RAdam':
+            self.optimizer = 9
+
+        # バッチサイズの選択
+        if Target == 'both' or Target == 'network':
+            # self.batch_size = trial.suggest_categorical("batch_size",[8,16,32,64,128])
+            self.batch_size = 128
+        else:
+            self.batch_size = 128
+
+        # 報酬の選択
+        if Target == 'both' or Target == 'reward':
+            self.r_collision = trial.suggest_float("r_collision", 50, 2000, step=10)
+            self.r_just = trial.suggest_float("r_just", 0.1, 0.7, step=0.01)
+            self.r_near = trial.suggest_float("r_near", 1, 7, step=0.1)
+            self.r_goal = trial.suggest_float("r_goal", 50, 2000, step=10)
+        else:
+            self.r_collision = None
+            self.r_just = None
+            self.r_near = None
+            self.r_goal = None
+        
+        if self.network == 'CNN':
+            self.network = 0
+        elif self.network == 'DCNN':
+            self.network = 1
+        elif self.network == 'MLP':
+            self.network = 2
+        
+        if Target == 'both':
+            self.Target = 0
+        elif Target == 'network':
+            self.Target = 1
+        elif Target == 'reward':
+            self.Target = 2
+
+
+class DynamicGammaTPE(TPESampler): # 上位群の割合を変動させるTPE
+    def __init__(self, initial_gamma, final_gamma, stop_trial, random_trials, **kwargs):
+        super().__init__(**kwargs)
+        self._n_startup_trials = random_trials
+        self.initial_gamma = initial_gamma
+        self.final_gamma = final_gamma
+        self.stop_trial = stop_trial
+
+    def gamma(self, current_trial_number): # 新しく追加した上位群の割合を設定するメソッド
+        if current_trial_number <= self._n_startup_trials: # ランダムサーチのフェーズ(ガンマ固定)
+            adopted_gamma = self.initial_gamma
+        elif current_trial_number < self.stop_trial: # ガンマを線形減少させるフェーズ
+            adopted_gamma = self.initial_gamma + (self.final_gamma - self.initial_gamma) * ((current_trial_number - self._n_startup_trials) / (self.stop_trial - self._n_startup_trials))
+        else: # ガンマを固定するフェーズ
+            adopted_gamma = self.final_gamma
+        return lambda n: max(1, int(n * adopted_gamma))
+    
+    def _sample(
+        self, study, trial, search_space
+    ): # 上位群と下位群を分割するメソッドの上書き
+        if self._constant_liar:
+            states = [TrialState.COMPLETE, TrialState.PRUNED, TrialState.RUNNING]
+        else:
+            states = [TrialState.COMPLETE, TrialState.PRUNED]
+        use_cache = not self._constant_liar
+        trials = study._get_trials(deepcopy=False, states=states, use_cache=use_cache)
+
+        self._gamma = self.gamma(len(study.trials))
+
+        # We divide data into below and above.
+        n = sum(trial.state != TrialState.RUNNING for trial in trials)  # Ignore running trials.
+        below_trials, above_trials = TPE_file._split_trials(
+            study,
+            trials,
+            self._gamma(n),
+            self._constraints_func is not None,
+        )
+        
+        # 上位群と下位群の内訳の出力
+        # print(len(below_trials), len(above_trials), round(len(below_trials)/(len(below_trials)+len(above_trials)), 2), round(len(above_trials)/(len(below_trials)+len(above_trials)), 2))
+
+        mpe_below = self._build_parzen_estimator(
+            study, search_space, below_trials, handle_below=True
+        )
+        mpe_above = self._build_parzen_estimator(
+            study, search_space, above_trials, handle_below=False
+        )
+
+        samples_below = mpe_below.sample(self._rng.rng, self._n_ei_candidates)
+        acq_func_vals = self._compute_acquisition_func(samples_below, mpe_below, mpe_above)
+        ret = TPESampler._compare(samples_below, acq_func_vals)
+
+        for param_name, dist in search_space.items():
+            ret[param_name] = dist.to_external_repr(ret[param_name])
+
+        return ret
+
+
+class Visual: # Optunaの可視化
+    def __init__(self):
+        self.to_trial = 10 # 何トライアルごとにグラフを作成するか
+        self.initial_trial = 50 # 何トライアル目からグラフを作成するか
+        self.png = True # 画像として保存するか
+        self.html = False # HTMLとして保存するか
+    
+    def v1(self, trial): # 単一目的
+        if len(study.trials) % self.to_trial == 0 and len(study.trials) >= self.initial_trial:
+            print ('save graph')
+
+            dt = datetime.now()
+            f_score_file =  os.path.dirname(os.path.realpath(__file__)) + '/score/'
+            dtstr = dt.strftime('%d_%H:%M')
+
+            # グラフの作成
+            fig = optuna.visualization.plot_optimization_history(study) # 全トライアルのスコアとベストスコア
+            if self.png:
+                fig.write_image(f_score_file + dtstr + '_' + str(len(study.trials)) + 'trial_history.png')
+            if self.html:
+                fig.write_html(f_score_file + dtstr + '_' + str(len(study.trials)) + 'trial_history.html')
+
+            fig = optuna.visualization.plot_slice(study) # パラメータのどの値を重点的に探索しているかを見る
+            if self.png:
+                fig.write_image(f_score_file + dtstr + '_' + str(len(study.trials)) + 'trial_slice.png')
+            if self.html:
+                fig.write_html(f_score_file + dtstr + '_' + str(len(study.trials)) + 'trial_slice.html')
+
+            fig = optuna.visualization.plot_param_importances(study) # 各パラメータがscore向上にどれだけ効いたか見る
+            if self.png:
+                fig.write_image(f_score_file + dtstr + '_' + str(len(study.trials)) + 'trial_importances.png')
+            if self.html:
+                fig.write_html(f_score_file + dtstr + '_' + str(len(study.trials)) + 'trial_importances.html')
+
+            # fig = optuna.visualization.plot_parallel_coordinate(study) # scoreが高いパラメータの組み合わせを見る
+            # if self.png:
+            #     fig.write_image(f_score_file + dtstr + '_' + str(len(study.trials)) + 'trial_coordinate.png')
+            # if self.html:
+            #     fig.write_html(f_score_file + dtstr + '_' + str(len(study.trials)) + 'trial_coordinate.html')
+
+            # fig = optuna.visualization.plot_contour(study) # 各2変数の組み合わせでそれぞれの値がどれだけ効くか見る
+            # if self.png:
+            #     fig.write_image(f_score_file + dtstr + '_' + str(len(study.trials)) + 'trial_contour.png')
+            # if self.html:
+            #     fig.write_html(f_score_file + dtstr + '_' + str(len(study.trials)) + 'trial_contour.html')
+    
+    def v2(self, trial): # 2目的
+        if len(study.trials) % self.to_trial == 0 and len(study.trials) >= self.initial_trial:
+            print ('save graph')
+
+            dt = datetime.now()
+            f_score_file =  os.path.dirname(os.path.realpath(__file__)) + '/score/'
+            dtstr = dt.strftime('%d_%H:%M')
+
+            # グラフの作成
+            fig = optuna.visualization.plot_pareto_front(study,include_dominated_trials=True)
+            if self.png:
+                fig.write_image(f_score_file + dtstr+'_'+str(len(study.trials))+'trial_pareto_front.png')
+            if self.html:
+                fig.write_html(f_score_file + dtstr + '_' + str(len(study.trials)) + 'trial_pareto_front.html')
+
+            fig = optuna.visualization.plot_slice(study,target=lambda t: t.values[0])
+            if self.png:
+                fig.write_image(f_score_file + dtstr+'_'+str(len(study.trials))+'trial_plot_slice1.png')
+            if self.html:
+                fig.write_html(f_score_file + dtstr + '_' + str(len(study.trials)) + 'trial_plot_slice1.html')
+
+            fig = optuna.visualization.plot_slice(study,target=lambda t: t.values[1])
+            if self.png:
+                fig.write_image(f_score_file + dtstr+'_'+str(len(study.trials))+'trial_plot_slice2.png')
+            if self.html:
+                fig.write_html(f_score_file + dtstr + '_' + str(len(study.trials)) + 'trial_plot_slice2.html')
+
+
+def main(trial):
+
+    a = Main(trial)
+    
+    print('params = ' + str(study.trials[-1].params))
+
+    params = {
+        'network': a.network, 
+        'conv_num': a.conv_num, 
+        'mid_layer_num': a.mid_layer_num, 
+        'mid_units1': a.mid_units1, 
+        'mid_units2': a.mid_units2 if a.mid_units2 is not None else -1, 
+        'mid_units3': a.mid_units3 if a.mid_units3 is not None else -1, 
+        'cnv_act': a.cnv_act if a.cnv_act is not None else -1, 
+        'ful_act': a.ful_act if a.ful_act is not None else -1, 
+        'optimizer': a.optimizer, 
+        'batch_size': a.batch_size, 
+        'r_collision': a.r_collision if a.r_collision is not None else -1, 
+        'r_just': a.r_just if a.r_just is not None else -1, 
+        'r_near': a.r_near if a.r_near is not None else -1, 
+        'r_goal': a.r_goal if a.r_goal is not None else -1, 
+        'Target': a.Target, 
+        'trials': len(study.trials)-1
+    }
+
+    pub_baton = rospy.Publisher('baton', Float32MultiArray, queue_size=5)
+    baton = Float32MultiArray(data=list(params.values()))
+    # batonをturtlebot3_3robot_avoid_main(トピック名: 'baton')へ送る
+    while pub_baton.get_num_connections() < 3:
+        pass
+    pub_baton.publish(baton)
+
+    score_list = []
+
+    # batonをturtlebot3_3robot_avoid_main(トピック名: 'score')から受け取る
+    while [len(v) for v in score_list] != [4, 4, 4]:
+        try:
+            score = rospy.wait_for_message('score', Float32MultiArray, timeout=3)
+            score_list.append(list(score.data))
+            start_time = time.time() # 情報を受け取ったときのみここを通る
+        except:
+            if len(score_list) >= 1:
+                now_time = time.time()
+                if (now_time - start_time) > 15: # 情報を受け取ってから時間経過で進む
+                    break
+            pass
+    
+    if len(score_list) == 3: # 通常時([agent.robot_n, score_1st_last, score_2nd_last, score_3rd_last])
+        robot_list = [score_list[0][0], score_list[1][0], score_list[2][0]]
+        score_1st_last_list = [score_list[0][1], score_list[1][1], score_list[2][1]]
+        score_2nd_last_list = [score_list[0][2], score_list[1][2], score_list[2][2]]
+        score_3rd_last_list = [score_list[0][3], score_list[1][3], score_list[2][3]]
+    else: # 3台分の評価値を得られなかったときの処理
+        robot_list = [0, 1, 2]
+        score_1st_last_list = [20, 20, 20]
+        score_2nd_last_list = [20, 20, 20]
+        score_3rd_last_list = [20, 20, 20]
+    
+    score_1st_last_ave = round(sum(score_1st_last_list) / len(score_1st_last_list), 2)
+    score_2nd_last_ave = round(sum(score_2nd_last_list) / len(score_2nd_last_list), 2)
+    score_3rd_last_ave = round(sum(score_3rd_last_list) / len(score_3rd_last_list), 2)
+    score_ave_list = [score_1st_last_ave, score_2nd_last_ave, score_3rd_last_ave]
+
+    # Optuna評価値とするスコアを決定
+    max_index = score_ave_list.index(max(score_ave_list))
+    if max_index == 0:
+        optuna_select = "score_1st_last"
+    elif max_index == 1:
+        optuna_select = "score_2nd_last"
+    elif max_index == 2:
+        optuna_select = "score_3rd_last"
+    score_list_ave = score_ave_list[max_index]
+    
+    print('score_list = ' + str(score_list_ave) + ', select = ' + str(optuna_select))
+
+    # Optunaの記録
+    if len(study.trials) - 1 == 0:
+        o = '0'
+    elif study.best_trial.value <= score_list_ave:
+        o = str(len(study.trials) - 1)
+    else:
+        o = str(study.best_trial.number)
+    text = [
+        "TRIAL: " + str(len(study.trials) - 1) + "\n", 
+        "parameter: " + str(study.trials[-1].params) + "\n", 
+        "robot_list: " + str(robot_list) + "\n", 
+        "score_1st_last: " + str([round(num, 2) for num in score_1st_last_list]) + " average: " + str(score_1st_last_ave) + "\n", 
+        "score_2nd_last: " + str([round(num, 2) for num in score_2nd_last_list]) + " average: " + str(score_2nd_last_ave) + "\n", 
+        "score_3rd_last: " + str([round(num, 2) for num in score_3rd_last_list]) + " average: " + str(score_3rd_last_ave) + "\n", 
+        "select: " + optuna_select + " score: " + str(score_list_ave) + "\n", 
+        "best_trial: " + o + "\n\n"
+    ]
+    with open(f_learning_name, 'a') as f: # ファイルにテキストを書き込む
+        f.writelines(text)
+
+    # グラフの作成
+    visual = Visual()
+    visual.v1(trial)
+    
+    # パラメータファイルの削除(トライアルが多い場合は必須)
+    dirPath = os.path.dirname(os.path.realpath(__file__))
+    dirPath = dirPath.replace('/nodes', '/save_model')
+    shutil.rmtree(dirPath + '/' + 'TRIAL' + str(len(study.trials) - 1) + '/')
+
+    return round(score_list_ave, 2)
+
+
+if __name__ == '__main__':
+    
+    rospy.init_node('turtlebot3_3robot_avoid_optuna')
+    global Target
+
+    optuna_db_name = datetime.now().strftime('%m_%d_99') # データベースの名前
+    optuna_db_path = 'sqlite:///' + os.path.dirname(os.path.realpath(__file__)) + '/score/optuna.db' # データベースの保存場所
+
+    ### Optunaの設定 ###########
+    TRIAL_SIZE = 30 # 実行するトライアル数
+    Target = 'both' # 'both' or 'network' or 'reward'
+    save_study = False # Optunaの内容をデータベースに保存
+    load_study = False # 前回のOptunaの内容を引き継ぐ
+    load_db_name = '10_25_99' # Optunaの内容を引き継ぐデータベース名
+    shutdown = True # プログラム終了時にPCの電源を落とすか否か
+    fix = True # 0トライアルのパラメータ値の固定
+    choice_param_only = False # 指定したパラメータのみを用いる
+    choice_param_num = 20 # 指定したパラメータを試行する回数
+    ############################
+    
+    # 探索アルゴリズムの選択(使用するもの以外はコメントアウト)
+    # sampler = optuna.samplers.GridSampler()
+    # sampler = optuna.samplers.RandomSampler()
+    # sampler = optuna.samplers.CmaEsSampler()
+    # sampler = optuna.samplers.NSGAIISampler()
+    # sampler = optuna.samplers.QMCSampler()
+    # sampler = optuna.samplers.BruteForceSampler()
+    # sampler = optuna.samplers.TPESampler()
+    # sampler = optuna.integration.BoTorchSampler(random_trials=10) # 新しいverのOptunaにて使用可能
+
+    """ 上位群の割合を減少させるTPE(initial_gamma: 最初の上位群の割合, final_gamma: 減少後の上位群の割合, stop_trial: 割合減少を止めるトライアル, random_trials: ランダムサーチのトライアル数) """
+    sampler = DynamicGammaTPE(initial_gamma=0.7, final_gamma=0.1, stop_trial=50, random_trials=10)
+
+    if load_study:
+        study = optuna.load_study(study_name=load_db_name, storage=optuna_db_path, sampler=sampler)
+    elif save_study:
+        study = optuna.create_study(study_name=optuna_db_name, storage=optuna_db_path, sampler=sampler, direction='maximize')
+    else:
+        study = optuna.create_study(sampler=sampler, direction='maximize')
+    
+    #########記録ファイル作成########################################################
+    dt = datetime.now() # 現在時刻の取得
+    dtstr = dt.strftime('%m_%d_%H:%M:%S') # y(year), m(month), d(day), H(hour), M(minute), S(second)
+    f_learning_file =  os.path.dirname(os.path.realpath(__file__)) + '/score/' # os.path.dirname(os.path.realpath(__file__)) ← カレントディレクトリのパス
+    f_learning_name = f_learning_file + 'optuna_' + dtstr + '.txt'
+    if not os.path.exists(f_learning_file):
+        os.makedirs(f_learning_file)
+    text = [
+        "TRIAL_SIZE: " + str(TRIAL_SIZE) + "\n",
+        "Target: " + Target + "\n\n"
+    ]
+    with open(f_learning_name, 'w') as f: # ファイルに属性を書き込む
+        f.writelines(text)
+    ################################################################################
+
+    # 探索開始時間
+    time_optuna = time.time()
+
+    # 探索実行
+    if choice_param_only: # 指定したパラメータのみを用いる
+        for i in range(choice_param_num):
+            study.enqueue_trial({'conv_num': 2, 'mid_layer_num': 2, 'mid_units1': 512, 'mid_units2': 512, 'r_collision': 1000, 'r_just': 0.4, 'r_near': 5, 'r_goal': 2000})
+            study.optimize(main, n_trials=1)
+        # for i in range(choice_param_num):
+        #     study.enqueue_trial({'conv_num': 2, 'mid_layer_num': 2, 'mid_units1': 512, 'mid_units2': 512, 'r_collision': 50, 'r_just': 1, 'r_near': 2, 'r_goal': 1})
+        #     study.optimize(main, n_trials=1)
+    elif fix: # 初期値の固定
+        study.enqueue_trial({'conv_num': 2, 'mid_layer_num': 2, 'mid_units1': 512, 'mid_units2': 512, 'r_collision': 1000, 'r_just': 0.4, 'r_near': 5, 'r_goal': 2000})
+        study.optimize(main, n_trials=TRIAL_SIZE)
+    else: # スタンダード
+        study.optimize(main, n_trials=TRIAL_SIZE)
+
+    # 探索時間の取得と記入
+    seconds = int(time.time() - time_optuna)
+    m, s = divmod(seconds, 60)
+    h, m = divmod(m, 60)
+    text = [
+        "time: " + str(seconds) + "[s], " + str(h) + ":" + str(m) + ":" + str(s) + "[hour:min:sec]"
+    ]
+    with open(f_learning_name, 'a') as f:
+        f.writelines(text)
+
+    # ベストパラメータ・スコアの表示
+    print(f"\nbest_params={study.best_params}")
+    print(f"\nbest_value={study.best_value}\n")
+    
+    # ROSログファイルの削除(ROSの通信遅延を解消できる)
+    os.system('rosclean purge -y')
+    
+    # PCのシャットダウン
+    if shutdown:
+        os.system('shutdown -P +1')
+    
