@@ -20,9 +20,9 @@ import torch.nn.functional as F # 活性化関数
 import pfrl
 import torch
 # 使用自作ファイル
-from env_3rb_goal import Env # 環境ファイル
-import net_3rb_goal # ネットワーク
-import greedy_3rb_goal # 探索手法
+from env_goal_3rb import Env # 環境ファイル
+import net_goal_3rb # ネットワーク
+import greedy_goal_3rb # 探索手法
 
 class ReinforceAgent():
     def __init__(self, network, conv_num, mid_layer_num, mid_units1, mid_units2, 
@@ -97,12 +97,12 @@ class ReinforceAgent():
                     self.n_added_input += self.lidar_num
             
             if Target=='both' or Target=='network':
-                self.q_func = net_3rb_goal.Q_Func_Optuna(conv_num,mid_layer_num,mid_units1,
+                self.q_func = net_goal_3rb.Q_Func_Optuna(conv_num,mid_layer_num,mid_units1,
                     mid_units2,mid_units3,cnv_act,ful_act,
                     n_actions=self.action_size, n_input_channels=self.n_input_channels, 
                     n_added_input=self.n_added_input)
             else:
-                self.q_func = net_3rb_goal.Q_Func(n_actions=self.action_size, 
+                self.q_func = net_goal_3rb.Q_Func(n_actions=self.action_size, 
                 n_input_channels=self.n_input_channels, n_added_input=self.n_added_input)
         
         if self.net == 'DCNN':
@@ -121,12 +121,12 @@ class ReinforceAgent():
                     self.n_added_input += self.lidar_num
 
             if Target == 'both' or Target == 'network':
-                self.q_func = net_3rb_goal.Dueling_Q_Func_Optuna(
+                self.q_func = net_goal_3rb.Dueling_Q_Func_Optuna(
                     conv_num, mid_layer_num, mid_units1, mid_units2, mid_units3, cnv_act, ful_act,
                     n_actions=self.action_size, n_input_channels=self.n_input_channels, n_added_input=self.n_added_input
                 )
             else:
-                self.q_func = net_3rb_goal.Dueling_Q_Func(
+                self.q_func = net_goal_3rb.Dueling_Q_Func(
                     n_actions=self.action_size, n_input_channels=self.n_input_channels, n_added_input=self.n_added_input
                 )
 
@@ -147,11 +147,11 @@ class ReinforceAgent():
                     self.n_added_input += self.lidar_num
             
             if Target == 'both' or Target == 'network':
-                self.q_func = net_3rb_goal.MLP_Optuna(
+                self.q_func = net_goal_3rb.MLP_Optuna(
                     mid_layer_num, mid_units1, mid_units2, mid_units3, ful_act, 
                     n_actions=self.action_size, n_input=self.n_input, n_added_input=self.n_added_input)
             else:
-                self.q_func = net_3rb_goal.MLP(n_actions=self.action_size, n_input=self.n_input, n_added_input=self.n_added_input)
+                self.q_func = net_goal_3rb.MLP(n_actions=self.action_size, n_input=self.n_input, n_added_input=self.n_added_input)
 
         if optimizer == 'SGD':
             self.optimizer = torch.optim.SGD(self.q_func.parameters(), momentum=0)
@@ -177,7 +177,7 @@ class ReinforceAgent():
         self.batch_size = batch_size
 
         if self.exploration == 'd_egreedy': # εが減衰
-            self.explorer = greedy_3rb_goal.MyEpsilonGreedy(
+            self.explorer = greedy_goal_3rb.MyEpsilonGreedy(
                 start_epsilon = 0.1,
                 end_epsilon = 0.0,
                 decay_steps = self.episode*self.episode_step,
@@ -187,7 +187,7 @@ class ReinforceAgent():
                 action_size = self.action_size
             )
         elif self.exploration == 'c_egreedy': # εが一定
-            self.explorer = greedy_3rb_goal.MyConstantGreedy(
+            self.explorer = greedy_goal_3rb.MyConstantGreedy(
                 epsilon=0, # 0ならgreedy
                 random_action_func=lambda: np.random.randint(self.action_size),
                 # replay_start_size = 0,
