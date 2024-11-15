@@ -510,9 +510,6 @@ if __name__ == '__main__':
         for i in range(choice_param_num):
             study.enqueue_trial({'conv_num': 2, 'mid_layer_num': 2, 'mid_units1': 512, 'mid_units2': 512, 'r_collision': 1000, 'r_just': 0.4, 'r_near': 5, 'r_goal': 2000})
             study.optimize(main, n_trials=1)
-        # for i in range(choice_param_num):
-        #     study.enqueue_trial({'conv_num': 2, 'mid_layer_num': 2, 'mid_units1': 512, 'mid_units2': 512, 'r_collision': 50, 'r_just': 1, 'r_near': 2, 'r_goal': 1})
-        #     study.optimize(main, n_trials=1)
     elif fix: # 初期値の固定
         study.enqueue_trial({'conv_num': 2, 'mid_layer_num': 2, 'mid_units1': 512, 'mid_units2': 512, 'r_collision': 1000, 'r_just': 0.4, 'r_near': 5, 'r_goal': 2000})
         study.optimize(main, n_trials=TRIAL_SIZE)
