@@ -14,8 +14,8 @@
   <remap from="/get_action" to="/tb3_0/get_action"/>
   <remap from="/result" to="/tb3_0/result"/>
   <remap from="/xyzY" to="/tb3_0/xyzY"/>
-  <node pkg="turtlebot3_dqn" type="turtlebot3_3robot_avoid_main" 
-  name="turtlebot3_3robot_avoid_main_0" output="screen"/>
+  <node pkg="turtlebot3_dqn" type="main_3rb_goal" 
+  name="main_3rb_goal_0" output="screen"/>
 
   <remap from="/robot_num" to="/tb3_1/robot_num"/>
   <remap from="/robot_me" to="/robot_1"/>
@@ -28,8 +28,8 @@
   <remap from="/get_action" to="/tb3_1/get_action"/>
   <remap from="/result" to="/tb3_1/result"/>
   <remap from="/xyzY" to="/tb3_1/xyzY"/>
-  <node pkg="turtlebot3_dqn" type="turtlebot3_3robot_avoid_main" 
-  name="turtlebot3_3robot_avoid_main_1" output="screen"/>
+  <node pkg="turtlebot3_dqn" type="main_3rb_goal" 
+  name="main_3rb_goal_1" output="screen"/>
 
   <remap from="/robot_num" to="/tb3_2/robot_num"/>
   <remap from="/robot_me" to="/robot_2"/>
@@ -42,10 +42,10 @@
   <remap from="/get_action" to="/tb3_2/get_action"/>
   <remap from="/result" to="/tb3_2/result"/>
   <remap from="/xyzY" to="/tb3_2/xyzY"/>
-  <node pkg="turtlebot3_dqn" type="turtlebot3_3robot_avoid_main" 
-  name="turtlebot3_3robot_avoid_main_2" output="screen"/>
+  <node pkg="turtlebot3_dqn" type="main_3rb_goal" 
+  name="main_3rb_goal_2" output="screen"/>
 
-  <node pkg="turtlebot3_dqn" type="turtlebot3_3robot_avoid_optuna" name="turtlebot3_3robot_avoid_optuna" output="screen" />
+  <node pkg="turtlebot3_dqn" type="optuna_3rb_goal" name="turtlebot3_3robot_avoid_optuna" output="screen" />
 
 
 </launch>
