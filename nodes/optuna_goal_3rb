@@ -21,7 +21,6 @@ import cv2
 import rospy
 from std_msgs.msg import Float32MultiArray, Int32MultiArray, Float32, Int32
 import os
-import my_explorer
 import time
 import sys
 import optuna
