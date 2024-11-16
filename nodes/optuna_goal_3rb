@@ -462,8 +462,8 @@ if __name__ == '__main__':
     load_db_name = '10_25_99' # Optunaの内容を引き継ぐデータベース名
     shutdown = True # プログラム終了時にPCの電源を落とすか否か
     fix = True # 0トライアルのパラメータ値の固定
-    choice_param_only = False # 指定したパラメータのみを用いる
-    choice_param_num = 20 # 指定したパラメータを試行する回数
+    choice_param_only = True # 指定したパラメータのみを用いる
+    choice_param_num = 5 # 指定したパラメータを試行する回数
     ############################
     
     # 探索アルゴリズムの選択(使用するもの以外はコメントアウト)

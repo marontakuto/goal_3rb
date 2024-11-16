@@ -310,7 +310,7 @@
           <material>
             <script>
               <uri>file://media/materials/scripts/gazebo.material</uri>
-              <name>Gazebo/Orange</name>
+              <name>Gazebo/Purple</name>
             </script>
           </material>
         </visual>

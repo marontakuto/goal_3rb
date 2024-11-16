@@ -572,6 +572,7 @@ class ReinforceAgent():
                         
                         break
 
+
 # メイン
 def summary(params):
 

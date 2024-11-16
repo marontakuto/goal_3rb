@@ -48,7 +48,8 @@ class Env():
         self.lidar_max = 2 # 対象のworldにおいて取りうるlidarの最大値(simの貫通対策や正規化に使用)
         self.lidar_min = 0.12 # lidarの最小測距値[m]
         self.range_margin = self.lidar_min + 0.03 # 衝突として処理される距離[m] 0.02
-        self.display_image = False # 入力画像を表示する
+        self.display_image_normal = False # 入力画像を表示する
+        self.display_image_mask = True # 入力画像を表示する
         self.start_time = self.get_clock() # トライアル開始時の時間取得
 
         # Optunaで選択された報酬値
@@ -57,6 +58,16 @@ class Env():
         self.r_near = r_near
         self.r_goal = r_goal
         self.Target = Target
+
+        # 初期のゴールの色
+        if self.robot_n == 0:
+            self.goal_color = 'purple'
+        elif self.robot_n == 1:
+            self.goal_color = 'green'
+        elif self.robot_n == 2:
+            self.goal_color = 'yellow'
+        elif self.robot_n == 3:
+            self.goal_color = 'red'
 
     def pass_img(self,img): # 画像正常取得用callback
         pass
@@ -149,10 +160,11 @@ class Env():
                 img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB) # カラー画像
             
             # img = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY) # グレースケール
+            # img = cv2.cvtColor(img, cv2.COLOR_RGB2HSV) # HSV
 
             img = cv2.resize(img, (48, 27)) # 取得した画像を48×27[pixel]に変更
 
-            if self.display_image:
+            if self.display_image_normal:
                 disp_img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR) # 標準フォーマットBGR
 
                 # アスペクト比を維持してリサイズ
@@ -245,6 +257,8 @@ class Env():
         scan = self.get_lidar() # LiDAR値の取得
         collision = False
 
+        img, goal_num = self.goal_mask(img) # 目標ゴールを緑に, 他のゴールを黒に変換
+
         # 入力するカメラ画像の処理
         if ('cam' in self.input_list) or ('previous_cam' in self.input_list) or ('previous2_cam' in self.input_list):
             input_img = np.asarray(img, dtype=np.float32)
@@ -299,7 +313,18 @@ class Env():
                     collision = False
         
         # 画像情報によるゴール判定
-        goal, goal_num = self.goal_judge(img)
+        if goal_num > 300:
+            goal = True
+
+            # 目標のゴールを反対側のゴールに設定
+            if self.goal_color == 'red':
+                self.goal_color = 'green'
+            elif self.goal_color == 'green':
+                self.goal_color = 'red'
+            elif self.goal_color == 'yellow':
+                self.goal_color = 'purple'
+            elif self.goal_color == 'purple':
+                self.goal_color = 'yellow'
         
         return state_list, img, scan, input_scan, collision, goal, goal_num
    
@@ -600,27 +625,72 @@ class Env():
 
     # 以降追加システム
 
-    def goal_judge(self, img): # ロボットのゴール判定
+    def goal_mask(self, img): # 目標ゴールを緑に, 他のゴールを黒に変換
 
-        goal = False
+        # 画像をHSV色空間に変換
+        img_hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
 
-        if self.robot_n == 0: # オレンジ
-            goal_lower = np.array([0, 150, 90])
-            goal_upper = np.array([20, 255, 255])
-        elif self.robot_n == 1: # 緑
-            goal_lower = np.array([55, 100, 60])
-            goal_upper = np.array([85, 255, 255])
-        elif self.robot_n == 2: # 黄
-            goal_lower = np.array([15, 150, 90])
-            goal_upper = np.array([35, 255, 255])
+        # 色範囲を定義 (HSVの値)
+        color_ranges = {
+            "red": [(0, 50, 50), (10, 255, 255)],   # 赤 (低域)
+            "red2": [(170, 150, 90), (180, 255, 255)],   # 赤 (高域)
+            "green": [(50, 50, 50), (70, 255, 255)],   # 緑
+            "yellow": [(20, 50, 50), (30, 255, 255)],  # 黄
+            "purple": [(130, 50, 50), (160, 255, 255)] # 紫
+        }
 
-        img_hsv = cv2.cvtColor(img, cv2.COLOR_RGB2HSV) #HSV
-        goal_mask = cv2.inRange(img_hsv, goal_lower, goal_upper)
-        goal_num = np.count_nonzero(goal_mask)
-        if goal_num > 300:
-            goal = True
+        # goal_colorを鮮やかな緑に変換
+        goal_num = 0
+
+        if self.goal_color == 'red':
+            # 'red' と 'red2' の両方を緑に変換
+            red_ranges = ['red', 'red2']
+            for red_range in red_ranges:
+                lower, upper = color_ranges[red_range]
+                lower_bound = np.array(lower, dtype=np.uint8)
+                upper_bound = np.array(upper, dtype=np.uint8)
+                mask_goal = cv2.inRange(img_hsv, lower_bound, upper_bound)
+                img[mask_goal > 0] = [0, 255, 0]  # 鮮やかな緑
+                goal_num += cv2.countNonZero(mask_goal)  # ゴールの画素数をカウント
+        else:
+            if self.goal_color in color_ranges:
+                lower, upper = color_ranges[self.goal_color]
+                lower_bound = np.array(lower, dtype=np.uint8)
+                upper_bound = np.array(upper, dtype=np.uint8)
+                mask_goal = cv2.inRange(img_hsv, lower_bound, upper_bound)
+                img[mask_goal > 0] = [0, 255, 0]  # 鮮やかな緑
+                goal_num += cv2.countNonZero(mask_goal)  # ゴールの画素数をカウント
+
+        # goal_color以外を黒色に変更
+        for color, (lower, upper) in color_ranges.items():
+            if color == self.goal_color or (self.goal_color == 'red' and color in ['red', 'red2']):
+                continue
+            lower_bound = np.array(lower, dtype=np.uint8)
+            upper_bound = np.array(upper, dtype=np.uint8)
+            mask = cv2.inRange(img_hsv, lower_bound, upper_bound)
+            img[mask > 0] = [0, 0, 0]  # 他の色は黒に
         
-        return goal, goal_num
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB) # RGBに変換
+
+        # 画像の出力
+        if self.display_image_mask:
+            disp_img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR) # 標準フォーマットBGR
+
+            # アスペクト比を維持してリサイズ
+            height, width = disp_img.shape[:2]
+            target_width, target_height = 480, 270
+            scale = min(target_width / width, target_height / height)
+            new_width = int(width * scale)
+            new_height = int(height * scale)
+            disp_img = cv2.resize(disp_img, (new_width, new_height))
+
+            # ウィンドウを表示
+            cv2.namedWindow('camera', cv2.WINDOW_NORMAL)
+            cv2.resizeWindow('camera', target_width, target_height)
+            cv2.imshow('camera', disp_img)
+            cv2.waitKey(1)
+        
+        return img, goal_num
 
     def stop(self): # ロボットの停止
         vel_cmd = Twist()
