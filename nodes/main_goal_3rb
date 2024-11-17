@@ -260,7 +260,7 @@ class ReinforceAgent():
                     pass
                 #####################################
 
-                next_state, reward, color_num, just_count, collision, goal, input_scan = env.step(action, deceleration, self.teleport, test=False) # 行動、状態の観測、報酬の一連の処理
+                next_state, reward, color_num, just_count, collision, _, input_scan = env.step(action, deceleration, self.teleport, test=False) # 行動、状態の観測、報酬の一連の処理
                 next_state = torch.from_numpy(next_state).float()
                 self.model.observe(next_state, reward, collision, reset=False) # モデルの更新
 
@@ -421,10 +421,8 @@ class ReinforceAgent():
                         done = True
                     elif collision:
                         collisions += 1
-                        collision = False
                         done = True
-
-                    if t == self.test_step:
+                    elif t == self.test_step:
                         done = True
                     
                     if done:

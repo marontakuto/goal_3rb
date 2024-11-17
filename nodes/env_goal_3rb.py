@@ -151,105 +151,21 @@ class Env():
                 except:
                     self.stop()
                     pass
-
-            if self.mode == 'sim':
-                img = ros_numpy.numpify(img)
-            else:
-                img = np.frombuffer(img.data, np.uint8)
-                img = cv2.imdecode(img, cv2.IMREAD_COLOR)
-                img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB) # カラー画像
             
-            # img = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY) # グレースケール
+            img = np.frombuffer(img.data, np.uint8)
+            img = cv2.imdecode(img, cv2.IMREAD_COLOR)
+            img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB) # カラー画像
             # img = cv2.cvtColor(img, cv2.COLOR_RGB2HSV) # HSV
-
+            # img = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY) # グレースケール
             img = cv2.resize(img, (48, 27)) # 取得した画像を48×27[pixel]に変更
 
             if self.display_image_normal:
-                disp_img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR) # 標準フォーマットBGR
-
-                # アスペクト比を維持してリサイズ
-                height, width = disp_img.shape[:2]
-                target_width, target_height = 480, 270
-                scale = min(target_width / width, target_height / height)
-                new_width = int(width * scale)
-                new_height = int(height * scale)
-                disp_img = cv2.resize(disp_img, (new_width, new_height))
-
-                # ウィンドウを表示
-                cv2.namedWindow('camera', cv2.WINDOW_NORMAL)
-                cv2.resizeWindow('camera', target_width, target_height)
-                cv2.imshow('camera', disp_img)
-                cv2.waitKey(1)
+                self.display_image(img, 'camera_normal')
             
             self.img = img
 
         return self.img
-
-    def get_count(self, img, middle=False, left=False, middle2=False, all=False, middle3=False, right=False, left2=False, left3=False, left4=False, left5=False, side=False):
-        # 色の設定
-        outside_lower = np.array([0, 0, 0], dtype=np.uint8) # 黒
-        outside_upper = np.array([255, 255, 80], dtype=np.uint8)
-        inside_lower = np.array([0, 150, 90], dtype=np.uint8) # オレンジ
-        inside_upper = np.array([20, 255, 255], dtype=np.uint8) 
-        robot_blue_lower = np.array([85, 100, 50], dtype=np.uint8) # ブルー
-        robot_blue_upper = np.array([130, 255, 255], dtype=np.uint8)
-        robot_green_lower = np.array([55, 100, 60], dtype=np.uint8) # グリーンnp.array([40, 50, 50])
-        robot_green_upper = np.array([85, 255, 255], dtype=np.uint8)
-
-        if middle:
-            img = img[:, len(img[0]) * 4 // 9:len(img[0]) * 5 // 9]
-        if middle2:
-            img = img[:, len(img[0]) * 1 // 3:len(img[0]) * 2 // 3] # 1/3 ~ 2/3
-        if middle3:
-            img = img[:, len(img[0]) * 1 // 5:len(img[0]) * 4 // 5]
-        if left:
-            img = img[:, 0:len(img[0]) * 1 // 9]
-        if left2:
-            img = img[:, 0:len(img[0]) * 4 // 9]
-        if left3:
-            img = img[:, 0:len(img[0]) * 1 // 2]
-        if left4:
-            img = img[:, 0:len(img[0]) * 1 // 3]
-        if left5:
-            img = img[:, 0:len(img[0]) * 1 // 5]
-        if right:
-            img = img[:, len(img[0]) * 8 // 9:len(img[0]) * 9 // 9]
-        if all:
-            img = img[:, len(img[0]) * 0 // 9:len(img[0]) * 9 // 9]
-        if side:
-            img = np.hstack((img[:, :len(img[1]) * 1 // 5], img[:, len(img[1]) * 4 // 5:]))
-        
-        img_hsv = cv2.cvtColor(img, cv2.COLOR_RGB2HSV)
-        outside = cv2.inRange(img_hsv, outside_lower, outside_upper)
-        inside = cv2.inRange(img_hsv, inside_lower, inside_upper)
-        robot = cv2.inRange(img_hsv, robot_blue_lower, robot_blue_upper)
-        robot2 = cv2.inRange(img_hsv, robot_green_lower, robot_green_upper)
-
-        outside_num = np.count_nonzero(outside)
-        inside_num = np.count_nonzero(inside)
-        robot_blue_num = np.count_nonzero(robot)
-        robot_green_num = np.count_nonzero(robot2)
-
-        if self.display_image:
-            disp_img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR) # 標準フォーマットBGR
-            disp_img = np.hstack((disp_img[:, :len(img[1]) * 1 // 5], disp_img[:, len(img[1]) * 4 // 5:]))
-
-            # アスペクト比を維持してリサイズ
-            height, width = disp_img.shape[:2]
-            target_width, target_height = 480, 270
-            scale = min(target_width / width, target_height / height)
-            new_width = int(width * scale)
-            new_height = int(height * scale)
-            disp_img = cv2.resize(disp_img, (new_width, new_height))
-
-            # ウィンドウを表示
-            cv2.namedWindow('camera', cv2.WINDOW_NORMAL)
-            cv2.resizeWindow('camera', target_width, target_height)
-            cv2.imshow('camera', disp_img)
-            cv2.waitKey(1)
-        
-        return outside_num, inside_num, robot_blue_num, robot_green_num
-
+    
     def getState(self): # 情報取得
 
         state_list = [] # 入力する情報を格納するリスト
@@ -328,13 +244,11 @@ class Env():
         
         return state_list, img, scan, input_scan, collision, goal, goal_num
    
-    def setReward(self, img, scan, collision, goal, goal_num, action):
+    def setReward(self, scan, collision, goal, goal_num):
 
         reward = 0
         color_num = 0
         just_count = 0
-
-        # _, _, _, _ = self.get_count(img, all=True)
         color_num = goal_num
 
         if self.Target == 'both' or self.Target == 'reward':
@@ -365,7 +279,7 @@ class Env():
 
         "最大速度 x: 0.22[m/s], z: 2.84[rad/s](162.72[deg/s])"
         "z値 0.785375[rad/s] = 45[deg/s], 1.57075[rad/s] = 90[deg/s], 2.356125[rad/s] = 135[deg/s]"
-        "行動時間は行動を決定してから次の行動が決まるまでのため1秒もない"
+        "行動時間は行動を決定してから次の行動が決まるまでであるため1秒もない"
 
         if action == 0: # 左折
             vel_cmd.linear.x = 0.2 # 直進方向[m/s]
@@ -391,13 +305,13 @@ class Env():
         vel_cmd.linear.z = vel_cmd.linear.z * deceleration
         
         self.pub_cmd_vel.publish(vel_cmd) # 実行
-        state_list, img, scan, input_scan, collision, goal, goal_num = self.getState()
-        reward, color_num, just_count = self.setReward(img, scan, collision, goal, goal_num, action)
+        state_list, img, scan, input_scan, collision, goal, goal_num = self.getState() # 状態観測
+        reward, color_num, just_count = self.setReward(scan, collision, goal, goal_num) # 報酬計算
 
-        if (collision or goal) and not test: # 衝突時の処理(テスト時を除く)
-            if not teleport:
+        if not test: # テスト時でないときの処理
+            if (collision or goal) and not teleport:
                 self.restart() # 進行方向への向き直し
-            elif teleport:
+            elif collision and teleport:
                 self.relocation() # 空いているエリアへの再配置
                 time.sleep(0.1)
         
@@ -472,25 +386,22 @@ class Env():
 
         self.stop()
         
-        a = [0.55, 0.35, 0.02, 2.355] # 右上
-        b = [0.55, 1.45, 0.02, -2.355] # 左上
-        c = [-0.55, 1.45, 0.02, -0.785] # 左下
+        a = [0.55, 0.9, 0.02, 3.14] # 上
+        b = [0.55, 0.35, 0.02, 2.355] # 右上
+        c = [0.0, 0.35, 0.02, 1.57] # 右
+        d = [-0.55, 0.35, 0.02, 0.785] # 右下
+        e = [-0.55, 0.9, 0.02, 0.0] # 下
+        f = [-0.55, 1.45, 0.02, -0.785] # 左下
+        g = [0.0, 1.45, 0.02, -1.57] # 左
+        h = [0.55, 1.45, 0.02, -2.355] # 左上
 
         if num == 0: # 初期位置
             if self.robot_n == 0:
-                XYZyaw = a
-            if self.robot_n == 1:
                 XYZyaw = b
-            if self.robot_n == 2:
-                XYZyaw = c
-              
-        elif num == 99: # フィールド外
-            if self.robot_n == 0:
-                XYZyaw = [0, -0.5, 0.02, 3.14] # 右
             if self.robot_n == 1:
-                XYZyaw = [1.4, 0.9, 0.02, -1.57] # 上
+                XYZyaw = h
             if self.robot_n == 2:
-                XYZyaw = [0, 2.2, 0.02, 0.0] # 左
+                XYZyaw = f
         
         elif num == 101: # フィールドの中心
             if self.robot_n == 0:
@@ -534,79 +445,56 @@ class Env():
         
 
         # 空いたエリアへのロボットの配置用[relocation()]
-        if num == 11:
-            XYZyaw = [0.55, 0.9, 0.02, 3.14] # 上
-        elif num == 12:
-            XYZyaw = [0.55, 0.35, 0.02, 2.355] # 右上
-        elif num == 13:
-            XYZyaw = [0.0, 0.35, 0.02, 1.57] # 右
-        elif num == 14:
-            XYZyaw = [-0.55, 0.35, 0.02, 0.785] # 右下
-        elif num == 15:
-            XYZyaw = [-0.55, 0.9, 0.02, 0.0] # 下
-        elif num == 16:
-            XYZyaw = [-0.55, 1.45, 0.02, -0.785] # 左下
-        elif num == 17:
-            XYZyaw = [0.0, 1.45, 0.02, -1.57] # 左
-        elif num == 18:
-            XYZyaw = [0.55, 1.45, 0.02, -2.355] # 左上
+        if num == 1001:
+            XYZyaw = a
+        elif num == 1002:
+            XYZyaw = b
+        elif num == 1003:
+            XYZyaw = c
+        elif num == 1004:
+            XYZyaw = d
+        elif num == 1005:
+            XYZyaw = e
+        elif num == 1006:
+            XYZyaw = f
+        elif num == 1007:
+            XYZyaw = g
+        elif num == 1008:
+            XYZyaw = h
 
-
-        if num == 1: # 以下テスト用
+        # テスト時の目標ゴールの設定
+        if 1 <= num <= 100:
             if self.robot_n == 0:
-                XYZyaw = a
+                self.goal_color = 'purple'
             if self.robot_n == 1:
-                XYZyaw = b
+                self.goal_color = 'green'
             if self.robot_n == 2:
-                XYZyaw = c
+                self.goal_color = 'yellow'
+
+        # 以下テスト用
+        if num in [1, 2]:
+            if self.robot_n == 0:
+                XYZyaw = b
+            if self.robot_n == 1:
+                XYZyaw = h
+            if self.robot_n == 2:
+                XYZyaw = f
         
-        elif num == 2:
+        elif num in [3, 4]:
             if self.robot_n == 0:
                 XYZyaw = a
             if self.robot_n == 1:
-                XYZyaw = b
+                XYZyaw = g
             if self.robot_n == 2:
-                XYZyaw = c
-
-        elif num == 3:
+                XYZyaw = e
+        
+        elif num in [5, 6]:
             if self.robot_n == 0:
-                XYZyaw = a
-            if self.robot_n == 1:
-                XYZyaw = b
-            if self.robot_n == 2:
                 XYZyaw = c
-
-        elif num == 4:
-            if self.robot_n == 0:
-                XYZyaw = a
             if self.robot_n == 1:
-                XYZyaw = b
+                XYZyaw = a
             if self.robot_n == 2:
-                XYZyaw = c
-
-        # elif num == 2:
-        #     if self.robot_n == 0:
-        #         XYZyaw = a
-        #     if self.robot_n == 1:
-        #         XYZyaw = [0.0, 1.45, 0.02, -1.57] # 左
-        #     if self.robot_n == 2:
-        #         XYZyaw = c
-
-        # elif num == 3:
-        #     if self.robot_n == 0:
-        #         XYZyaw = a
-        #     if self.robot_n == 1:
-        #         XYZyaw = [0.55, 0.9, 0.02, 3.14] # 上
-        #     if self.robot_n == 2:
-        #         XYZyaw = c
-
-        # elif num == 4:
-        #     if self.robot_n == 0:
-        #         XYZyaw = a
-        #     if self.robot_n == 1:
-        #         XYZyaw = [-0.55, 0.35, 0.02, 0.785] # 右下
-        #     if self.robot_n == 2:
-        #         XYZyaw = c
+                XYZyaw = g
         
         state_msg = ModelState()
         state_msg.model_name = 'tb3_{}'.format(self.robot_n)
@@ -627,70 +515,54 @@ class Env():
 
     def goal_mask(self, img): # 目標ゴールを緑に, 他のゴールを黒に変換
 
+        goal_num = 0
+
         # 画像をHSV色空間に変換
         img_hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
 
-        # 色範囲を定義 (HSVの値)
+        # 色範囲を定義(HSVの値)
         color_ranges = {
-            "red": [(0, 50, 50), (10, 255, 255)],   # 赤 (低域)
-            "red2": [(170, 150, 90), (180, 255, 255)],   # 赤 (高域)
-            "green": [(50, 50, 50), (70, 255, 255)],   # 緑
-            "yellow": [(20, 50, 50), (30, 255, 255)],  # 黄
+            "red": [(0, 50, 50), (10, 255, 255)], # 赤(低域)
+            "red2": [(170, 150, 90), (180, 255, 255)], # 赤(高域)
+            "green": [(50, 50, 50), (70, 255, 255)], # 緑
+            "yellow": [(20, 50, 50), (30, 255, 255)], # 黄
             "purple": [(130, 50, 50), (160, 255, 255)] # 紫
         }
 
-        # goal_colorを鮮やかな緑に変換
-        goal_num = 0
-
-        if self.goal_color == 'red':
-            # 'red' と 'red2' の両方を緑に変換
-            red_ranges = ['red', 'red2']
-            for red_range in red_ranges:
-                lower, upper = color_ranges[red_range]
-                lower_bound = np.array(lower, dtype=np.uint8)
-                upper_bound = np.array(upper, dtype=np.uint8)
-                mask_goal = cv2.inRange(img_hsv, lower_bound, upper_bound)
-                img[mask_goal > 0] = [0, 255, 0]  # 鮮やかな緑
-                goal_num += cv2.countNonZero(mask_goal)  # ゴールの画素数をカウント
-        else:
-            if self.goal_color in color_ranges:
-                lower, upper = color_ranges[self.goal_color]
-                lower_bound = np.array(lower, dtype=np.uint8)
-                upper_bound = np.array(upper, dtype=np.uint8)
-                mask_goal = cv2.inRange(img_hsv, lower_bound, upper_bound)
-                img[mask_goal > 0] = [0, 255, 0]  # 鮮やかな緑
-                goal_num += cv2.countNonZero(mask_goal)  # ゴールの画素数をカウント
-
-        # goal_color以外を黒色に変更
+        # 色の変換
         for color, (lower, upper) in color_ranges.items():
-            if color == self.goal_color or (self.goal_color == 'red' and color in ['red', 'red2']):
-                continue
             lower_bound = np.array(lower, dtype=np.uint8)
             upper_bound = np.array(upper, dtype=np.uint8)
             mask = cv2.inRange(img_hsv, lower_bound, upper_bound)
-            img[mask > 0] = [0, 0, 0]  # 他の色は黒に
-        
-        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB) # RGBに変換
+            if color == self.goal_color or (self.goal_color == 'red' and color in ['red', 'red2']):
+                goal_num += cv2.countNonZero(mask)
+                changed_color = [0, 255, 0] # ゴールは緑色に変換
+            else:
+                changed_color = [0, 0, 0] # 他の色は黒に変換
+            img[mask > 0] = changed_color
 
         # 画像の出力
         if self.display_image_mask:
-            disp_img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR) # 標準フォーマットBGR
-
-            # アスペクト比を維持してリサイズ
-            height, width = disp_img.shape[:2]
-            target_width, target_height = 480, 270
-            scale = min(target_width / width, target_height / height)
-            new_width = int(width * scale)
-            new_height = int(height * scale)
-            disp_img = cv2.resize(disp_img, (new_width, new_height))
-
-            # ウィンドウを表示
-            cv2.namedWindow('camera', cv2.WINDOW_NORMAL)
-            cv2.resizeWindow('camera', target_width, target_height)
-            cv2.imshow('camera', disp_img)
-            cv2.waitKey(1)
+            self.display_image(img, 'camera_mask')
         
         return img, goal_num
+    
+    def display_image(self, img, name): # カメラ画像の出力
+
+        # アスペクト比を維持してリサイズ
+        magnification = 10 # 出力倍率
+        height, width = img.shape[:2]
+        target_width, target_height = width * magnification, height * magnification # 出力サイズ(width, height)
+        scale = min(target_width / width, target_height / height)
+        new_width = int(width * scale)
+        new_height = int(height * scale)
+        disp_img = cv2.resize(img, (new_width, new_height))
+
+        # ウィンドウを表示
+        cv2.namedWindow(name, cv2.WINDOW_NORMAL)
+        cv2.resizeWindow(name, target_width, target_height)
+        cv2.imshow(name, disp_img)
+        cv2.waitKey(1)
 
     def stop(self): # ロボットの停止
         vel_cmd = Twist()
@@ -766,7 +638,7 @@ class Env():
                 teleport_area = 6
         
         # テレポート
-        self.set_robot(teleport_area + 10)
+        self.set_robot(teleport_area + 1000)
 
     def area_judge(self, terms, area):
         exist = False
@@ -827,7 +699,7 @@ class Env():
         probabilistic = True # True: リカバリー方策を確率的に利用する, False: リカバリー方策を必ず利用する
         initial_probability = 1.0 # 最初の確率
         finish_episode = 15 # 方策を適応する最後のエピソード
-        mode_change_episode = 11 # 行動変更のトリガーをLiDAR値からQ値に変えるエピソード 
+        mode_change_episode = 11 # 行動変更のトリガーをLiDAR値からQ値に変えるエピソード
         ############################
 
         # リカバリー方策の利用判定
@@ -873,11 +745,11 @@ class Env():
                 right_scan = input_scan[right[0]:right[-1] + 1]
                 scan_list = [left_scan, forward_scan, right_scan]
                 if len(bad_action) == 3: # 全方向のLiDAR値が低い場合はLiDAR値が最大の方向へ
-                    if max(front_scan) in left_scan: # left方向が空いている場合は左折
+                    if max(front_scan) in left_scan:
                         action = 0
-                    elif max(front_scan) in forward_scan: # forward方向が空いている場合は直進
+                    elif max(front_scan) in forward_scan:
                         action = 1
-                    elif max(front_scan) in right_scan: # right方向が空いている場合は右折
+                    elif max(front_scan) in right_scan:
                         action = 2
                 elif len(bad_action) == 2: # 2方向のLiDAR値が低い場合は残りの方向へ
                     action = (set([0, 1, 2]) - set(bad_action)).pop()
