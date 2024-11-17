@@ -21,7 +21,7 @@ Gazeboで群ロボットの回避行動の獲得を実現するためのリポ�
 10. 実機で動かす場合はIPアドレスなどの設定のために以下を実行してください
 11. sudo nano .bashrc # 実行後に最下層を以下のように変更
 
-> export ROS_MASTER_URI=http://<your_pc_ip>:11311 # <your_pc_ip>にはifconfigを実行して確認した「wl...:」のIPアドレスを入力
+> export ROS_MASTER_URI=http://<your_pc_ip>:11311 # <your_pc_ip>にはifconfigを実行して確認した「wl...:」のIPアドレスを入力<>br
 > export ROS_HOSTNAME=<your_pc_ip>
 
 12. source .bashrc # 変更内容の適用
