@@ -26,7 +26,7 @@ import greedy_goal_3rb # 探索手法
 
 class ReinforceAgent():
     def __init__(self, network, conv_num, mid_layer_num, mid_units1, mid_units2, 
-                 mid_units3, cnv_act, ful_act, optimizer, batch_size, Target):
+                 mid_units3, cnv_act, ful_act, optimizer, batch_size, Target, trials):
 
         # モデルを保存するためのパス
         self.current_dirPath = os.path.dirname(os.path.realpath(__file__)) # カレントディレクトリのパス
@@ -49,7 +49,7 @@ class ReinforceAgent():
         self.lidar_num = 36 # DQNに入力するlidarの方向数
         self.action_size = 4 # 行動の種類数
         self.episode = 45 # 40
-        self.eval_episode = 4 # 4
+        self.eval_episode = 6 # 4
         self.episode_step = 500 # 500
         self.test_step = 500 # 500
         self.target_update = 500 # 500
@@ -59,7 +59,7 @@ class ReinforceAgent():
         self.gpu = 0 # ON:0, OFF:-1
 
         ### 自ら作成した変数 ###
-        self.screen_list = [1] # 学習経過を出力するロボットの選択([0, 1] → robot0とrobot1の内容を出力)
+        self.screen_list = [2] # 学習経過を出力するロボットの選択([0, 1] → robot0とrobot1の内容を出力)
         self.recovery = True # リカバリー方策を適用するか否か
         self.teleport = True # 衝突時は空いたスペースに再配置する
         self.termination_e = 999 # ロボットがフィールド外の左側に存在したら強制終了を始めるエピソード(最初のエピソードから行っていると無駄な計算量が出る)
@@ -69,6 +69,11 @@ class ReinforceAgent():
         if self.all_episode_test: # すべてのエピソードをテストする場合は必ず同期する
             self.synchro = True
         ########################
+
+        ### オプション有無の実験 ###
+        if trials >= 5:
+            self.teleport = False
+        ############################
 
         #######################################################################################
 
@@ -260,7 +265,7 @@ class ReinforceAgent():
                     pass
                 #####################################
 
-                next_state, reward, color_num, just_count, collision, _, input_scan = env.step(action, deceleration, self.teleport, test=False) # 行動、状態の観測、報酬の一連の処理
+                next_state, reward, color_num, just_count, collision, _, input_scan = env.step(action, deceleration, test=False) # 行動、状態の観測、報酬の一連の処理
                 next_state = torch.from_numpy(next_state).float()
                 self.model.observe(next_state, reward, collision, reset=False) # モデルの更新
 
@@ -408,7 +413,7 @@ class ReinforceAgent():
                         pass
                     #####################################
 
-                    next_state, reward, color_num, just_count, collision, goal, input_scan = env.step(action, deceleration, self.teleport, test=True)
+                    next_state, reward, color_num, just_count, collision, goal, input_scan = env.step(action, deceleration, test=True)
                     next_state = torch.from_numpy(next_state).float()
                     self.model.observe(next_state, reward, collision, reset=False)
 
@@ -540,7 +545,7 @@ class ReinforceAgent():
                         pass
                     #####################################
 
-                    next_state, reward, color_num, just_count, collision, goal, input_scan = env.step(action, deceleration, self.teleport, test=False)
+                    next_state, reward, color_num, just_count, collision, goal, input_scan = env.step(action, deceleration, test=False)
                     next_state = torch.from_numpy(next_state).float()
                     self.model.observe(next_state, reward, collision, reset=False)
 
@@ -669,9 +674,9 @@ def summary(params):
     demonstration = False # デモンストレーションの有無
 
     agent = ReinforceAgent(network, conv_num, mid_layer_num, mid_units1, mid_units2, 
-                           mid_units3, cnv_act, ful_act, optimizer, batch_size, Target) # ReinforceAgentクラスのインスタンス化
+                           mid_units3, cnv_act, ful_act, optimizer, batch_size, Target, trials) # ReinforceAgentクラスのインスタンス化
 
-    env = Env(agent.mode, agent.robot_n, agent.lidar_num, agent.input_list, 
+    env = Env(agent.mode, agent.robot_n, agent.lidar_num, agent.input_list, agent.teleport, 
               r_collision, r_just, r_near, r_goal, Target) # Envクラスのインスタンス化(environmentファイルのクラス)
 
     #########記録ファイル作成########################################################

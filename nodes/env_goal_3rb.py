@@ -25,12 +25,13 @@ import sys
 import ros_numpy
 
 class Env():
-    def __init__(self, mode, robot_n, lidar_num, input_list, r_collision,  r_just, r_near, r_goal, Target):
+    def __init__(self, mode, robot_n, lidar_num, input_list, teleport, r_collision, r_just, r_near, r_goal, Target):
         
         self.mode = mode
         self.robot_n = robot_n
         self.lidar_num = lidar_num
         self.input_list = input_list
+        self.teleport = teleport
         self.previous_cam_list = deque([])
         self.previous_lidar_list = deque([])
         self.previous2_cam_list = deque([])
@@ -50,6 +51,7 @@ class Env():
         self.range_margin = self.lidar_min + 0.03 # 衝突として処理される距離[m] 0.02
         self.display_image_normal = False # 入力画像を表示する
         self.display_image_mask = True # 入力画像を表示する
+        self.display = [2] # カメラ画像を出力するロボットの識別番号
         self.start_time = self.get_clock() # トライアル開始時の時間取得
 
         # Optunaで選択された報酬値
@@ -152,15 +154,17 @@ class Env():
                     self.stop()
                     pass
             
-            img = np.frombuffer(img.data, np.uint8)
-            img = cv2.imdecode(img, cv2.IMREAD_COLOR)
+            if self.mode == 'sim':
+                img = ros_numpy.numpify(img)
+            else:
+                img = np.frombuffer(img.data, np.uint8)
+                img = cv2.imdecode(img, cv2.IMREAD_COLOR)
+            
             img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB) # カラー画像
-            # img = cv2.cvtColor(img, cv2.COLOR_RGB2HSV) # HSV
-            # img = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY) # グレースケール
             img = cv2.resize(img, (48, 27)) # 取得した画像を48×27[pixel]に変更
 
-            if self.display_image_normal:
-                self.display_image(img, 'camera_normal')
+            if self.display_image_normal and self.robot_n in self.display:
+                self.display_image(img, f'camera_normal_{self.robot_n}')
             
             self.img = img
 
@@ -168,13 +172,14 @@ class Env():
     
     def getState(self): # 情報取得
 
-        state_list = [] # 入力する情報を格納するリスト
-        img = self.get_camera() # カメラ画像の取得
-        scan = self.get_lidar() # LiDAR値の取得
         collision = False
+        goal = False
+        state_list = [] # 入力する情報を格納するリスト
 
+        img = self.get_camera() # カメラ画像の取得
         img, goal_num = self.goal_mask(img) # 目標ゴールを緑に, 他のゴールを黒に変換
-
+        scan = self.get_lidar() # LiDAR値の取得
+        
         # 入力するカメラ画像の処理
         if ('cam' in self.input_list) or ('previous_cam' in self.input_list) or ('previous2_cam' in self.input_list):
             input_img = np.asarray(img, dtype=np.float32)
@@ -233,14 +238,15 @@ class Env():
             goal = True
 
             # 目標のゴールを反対側のゴールに設定
-            if self.goal_color == 'red':
-                self.goal_color = 'green'
-            elif self.goal_color == 'green':
-                self.goal_color = 'red'
-            elif self.goal_color == 'yellow':
-                self.goal_color = 'purple'
-            elif self.goal_color == 'purple':
-                self.goal_color = 'yellow'
+            if not self.teleport:
+                if self.goal_color == 'red':
+                    self.goal_color = 'green'
+                elif self.goal_color == 'green':
+                    self.goal_color = 'red'
+                elif self.goal_color == 'yellow':
+                    self.goal_color = 'purple'
+                elif self.goal_color == 'purple':
+                    self.goal_color = 'yellow'
         
         return state_list, img, scan, input_scan, collision, goal, goal_num
    
@@ -270,7 +276,7 @@ class Env():
         
         return reward, color_num, just_count
 
-    def step(self, action, deceleration, teleport, test): # 1stepの行動
+    def step(self, action, deceleration, test): # 1stepの行動
 
         self.img = None
         self.scan = None
@@ -309,9 +315,9 @@ class Env():
         reward, color_num, just_count = self.setReward(scan, collision, goal, goal_num) # 報酬計算
 
         if not test: # テスト時でないときの処理
-            if (collision or goal) and not teleport:
+            if (collision or goal) and not self.teleport:
                 self.restart() # 進行方向への向き直し
-            elif collision and teleport:
+            elif collision or goal:
                 self.relocation() # 空いているエリアへの再配置
                 time.sleep(0.1)
         
@@ -463,7 +469,7 @@ class Env():
             XYZyaw = h
 
         # テスト時の目標ゴールの設定
-        if 1 <= num <= 100:
+        if 0 <= num <= 100:
             if self.robot_n == 0:
                 self.goal_color = 'purple'
             if self.robot_n == 1:
@@ -542,8 +548,8 @@ class Env():
             img[mask > 0] = changed_color
 
         # 画像の出力
-        if self.display_image_mask:
-            self.display_image(img, 'camera_mask')
+        if self.display_image_mask and self.robot_n in self.display:
+            self.display_image(img, f'camera_mask_{self.robot_n}')
         
         return img, goal_num
     
@@ -622,20 +628,20 @@ class Env():
         
         # 空いているエリア
         empty_area = [x for x in list(range(8, 0, -1)) if x not in exist_erea]
+
+        if self.goal_color == 'red':
+            target_list = [4, 5, 3]
+        elif self.goal_color == 'green':
+            target_list = [8, 1, 7]
+        elif self.goal_color == 'yellow':
+            target_list = [6, 7, 5]
+        elif self.goal_color == 'purple':
+            target_list = [2, 3, 1]
         
-        # テレポートさせるエリア
-        if self.robot_n == 0:
-            teleport_area = empty_area[-1]
-            if 2 in empty_area:
-                teleport_area = 2
-        elif self.robot_n == 1:
-            teleport_area = empty_area[0]
-            if 8 in empty_area:
-                teleport_area = 8
-        elif self.robot_n == 2:
-            teleport_area = empty_area[2]
-            if 6 in empty_area:
-                teleport_area = 6
+        for value in target_list:
+            if value in empty_area:
+                teleport_area = value
+                break
         
         # テレポート
         self.set_robot(teleport_area + 1000)
