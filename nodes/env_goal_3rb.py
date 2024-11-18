@@ -50,7 +50,7 @@ class Env():
         self.lidar_min = 0.12 # lidarの最小測距値[m]
         self.range_margin = self.lidar_min + 0.03 # 衝突として処理される距離[m] 0.02
         self.display_image_normal = False # 入力画像を表示する
-        self.display_image_mask = True # 入力画像を表示する
+        self.display_image_mask = False # 入力画像を表示する
         self.display = [2] # カメラ画像を出力するロボットの識別番号
         self.start_time = self.get_clock() # トライアル開始時の時間取得
 
