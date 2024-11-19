@@ -186,11 +186,13 @@ class Main():
             self.r_just = trial.suggest_float("r_just", 0.1, 0.7, step=0.01)
             self.r_near = trial.suggest_float("r_near", 1, 7, step=0.1)
             self.r_goal = trial.suggest_float("r_goal", 50, 2000, step=10)
+            self.r_cost = trial.suggest_float("r_cost", 1, 50, step=10)
         else:
             self.r_collision = None
             self.r_just = None
             self.r_near = None
             self.r_goal = None
+            self.r_cost = None
         
         if self.network == 'CNN':
             self.network = 0
@@ -360,6 +362,7 @@ def main(trial):
         'r_just': a.r_just if a.r_just is not None else -1, 
         'r_near': a.r_near if a.r_near is not None else -1, 
         'r_goal': a.r_goal if a.r_goal is not None else -1, 
+        'r_cost': a.r_cost if a.r_cost is not None else -1, 
         'Target': a.Target, 
         'trials': len(study.trials)-1
     }
@@ -507,10 +510,10 @@ if __name__ == '__main__':
     # 探索実行
     if choice_param_only: # 指定したパラメータのみを用いる
         for i in range(choice_param_num):
-            study.enqueue_trial({'conv_num': 2, 'mid_layer_num': 2, 'mid_units1': 512, 'mid_units2': 512, 'r_collision': 1000, 'r_just': 0.4, 'r_near': 5, 'r_goal': 2000})
+            study.enqueue_trial({'conv_num': 2, 'mid_layer_num': 2, 'mid_units1': 512, 'mid_units2': 512, 'r_collision': 1000, 'r_just': 0.4, 'r_near': 5, 'r_goal': 2000, 'r_cost': 10})
             study.optimize(main, n_trials=1)
     elif fix: # 初期値の固定
-        study.enqueue_trial({'conv_num': 2, 'mid_layer_num': 2, 'mid_units1': 512, 'mid_units2': 512, 'r_collision': 1000, 'r_just': 0.4, 'r_near': 5, 'r_goal': 2000})
+        study.enqueue_trial({'conv_num': 2, 'mid_layer_num': 2, 'mid_units1': 512, 'mid_units2': 512, 'r_collision': 1000, 'r_just': 0.4, 'r_near': 5, 'r_goal': 2000, 'r_cost': 10})
         study.optimize(main, n_trials=TRIAL_SIZE)
     else: # スタンダード
         study.optimize(main, n_trials=TRIAL_SIZE)

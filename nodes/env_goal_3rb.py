@@ -25,7 +25,7 @@ import sys
 import ros_numpy
 
 class Env():
-    def __init__(self, mode, robot_n, lidar_num, input_list, teleport, r_collision, r_just, r_near, r_goal, Target):
+    def __init__(self, mode, robot_n, lidar_num, input_list, teleport, r_collision, r_just, r_near, r_goal, r_cost, Target):
         
         self.mode = mode
         self.robot_n = robot_n
@@ -59,6 +59,7 @@ class Env():
         self.r_just = r_just
         self.r_near = r_near
         self.r_goal = r_goal
+        self.r_cost = r_cost
         self.Target = Target
 
         # 初期のゴールの色
@@ -263,6 +264,9 @@ class Env():
                 just_count = 1
             elif collision:
                 reward -= self.r_collision
+                reward -= self.r_cost
+            else:
+                reward -= self.r_cost
             reward += goal_num * self.r_just
             reward -= min(1 / (min(scan) + 0.01), 7) * self.r_near
         else:
@@ -271,6 +275,9 @@ class Env():
                 just_count = 1
             elif collision:
                 reward -= 50 # r_collision
+                reward -= 10 # r_cost
+            else:
+                reward -= 10 # r_cost
             reward += goal_num * 1 # r_just
             reward -= min(1 / (min(scan) + 0.01), 7) * 1 # r_near
         

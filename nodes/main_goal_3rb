@@ -595,8 +595,9 @@ def summary(params):
             'r_just': params.data[11], 
             'r_near': params.data[12], 
             'r_goal': params.data[13], 
-            'Target': params.data[14], 
-            'trials': params.data[15]
+            'r_cost': params.data[14], 
+            'Target': params.data[15], 
+            'trials': params.data[16]
         }
 
         network = params['network']
@@ -613,6 +614,7 @@ def summary(params):
         r_just = params['r_just']
         r_near = params['r_near']
         r_goal = params['r_goal']
+        r_cost = params['r_cost']
         Target = params['Target']
         trials = int(params['trials'])
 
@@ -677,7 +679,7 @@ def summary(params):
                            mid_units3, cnv_act, ful_act, optimizer, batch_size, Target, trials) # ReinforceAgentクラスのインスタンス化
 
     env = Env(agent.mode, agent.robot_n, agent.lidar_num, agent.input_list, agent.teleport, 
-              r_collision, r_just, r_near, r_goal, Target) # Envクラスのインスタンス化(environmentファイルのクラス)
+              r_collision, r_just, r_near, r_goal, r_cost, Target) # Envクラスのインスタンス化(environmentファイルのクラス)
 
     #########記録ファイル作成########################################################
     if training:
