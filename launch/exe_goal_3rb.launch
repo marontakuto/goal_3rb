@@ -45,7 +45,7 @@
   <node pkg="turtlebot3_dqn" type="main_goal_3rb" 
   name="main_goal_3rb_2" output="screen"/>
 
-  <node pkg="turtlebot3_dqn" type="optuna_goal_3rb" name="turtlebot3_3robot_avoid_optuna" output="screen" />
+  <node pkg="turtlebot3_dqn" type="optuna_goal_3rb" name="optuna_goal_3rb" output="screen" />
 
 
 </launch>
