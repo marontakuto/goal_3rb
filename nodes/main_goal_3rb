@@ -210,7 +210,7 @@ class ReinforceAgent():
             target_update_interval=self.target_update, n_times_update=1
         )
 
-    # Excelのファイル保存
+    # Excelファイルへの追記
     def excel(self, data, columns, file_name):
         data = pd.DataFrame(data, columns=columns)
         df = pd.read_excel(file_name)
