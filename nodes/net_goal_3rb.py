@@ -9,20 +9,6 @@ import pfrl
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
-from pfrl import action_value
-from pfrl.initializers import init_chainer_default
-from pfrl.nn.mlp import MLP
-from pfrl.q_function import StateQFunction
-
-import matplotlib.pyplot as plt
-import numpy as np
-import cv2
-
-import optuna
-import rospy
-from std_msgs.msg import Float32MultiArray,String,Float32,Header,Int32
-import time
 import math
 
 class Q_Func(nn.Module):
@@ -619,13 +605,13 @@ class Dueling_Q_Func_Optuna(nn.Module):
         self.img_width = img_width
         self.img_height = img_height
         super(Dueling_Q_Func_Optuna, self).__init__()
-        self.pool = nn.MaxPool2d(2,2,ceil_mode=True)
+        self.pool = nn.MaxPool2d(2, 2, ceil_mode=True)
 
         # convolution
         if self.conv_num == 1:
-            channels=[16, 64] #各畳込みでのカーネル枚数
-            kernels=[5, 5] #各畳込みでのカーネルサイズ
-            pool_info=[2] #[何回おきの畳み込みでプーリングするか]
+            channels = [16, 64] #各畳込みでのカーネル枚数
+            kernels = [5, 5] #各畳込みでのカーネルサイズ
+            pool_info = [2] #[何回おきの畳み込みでプーリングするか]
             self.conv1_1 = nn.Conv2d(n_input_channels, channels[0], kernels[0])
             nn.init.kaiming_normal_(self.conv1_1.weight)
             self.conv1_2 = nn.Conv2d(channels[0], channels[1], kernels[1])
@@ -633,9 +619,9 @@ class Dueling_Q_Func_Optuna(nn.Module):
             self.img_input = calculate(img_width, img_height, channels, kernels, pool_info)
         
         elif self.conv_num == 2:
-            channels=[8, 16, 64, 128] #各畳込みでのカーネル枚数
-            kernels=[5, 5, 5, 5] #各畳込みでのカーネルサイズ
-            pool_info=[2] #[何回おきの畳み込みでプーリングするか]
+            channels = [8, 16, 64, 128] #各畳込みでのカーネル枚数
+            kernels = [5, 5, 5, 5] #各畳込みでのカーネルサイズ
+            pool_info = [2] #[何回おきの畳み込みでプーリングするか]
             self.conv1_1 = nn.Conv2d(n_input_channels, channels[0], kernels[0])
             nn.init.kaiming_normal_(self.conv1_1.weight)
             self.conv1_2 = nn.Conv2d(channels[0], channels[1], kernels[1])
@@ -647,9 +633,9 @@ class Dueling_Q_Func_Optuna(nn.Module):
             self.img_input = calculate(img_width, img_height, channels, kernels, pool_info)
 
         elif self.conv_num == 3:
-            channels=[8, 16, 32, 64, 128, 256] #各畳込みでのカーネル枚数
-            kernels=[3, 3, 3, 3, 2, 2] #各畳込みでのカーネルサイズ
-            pool_info=[2] #[何回おきの畳み込みでプーリングするか]
+            channels = [8, 16, 32, 64, 128, 256] #各畳込みでのカーネル枚数
+            kernels = [3, 3, 3, 3, 2, 2] #各畳込みでのカーネルサイズ
+            pool_info = [2] #[何回おきの畳み込みでプーリングするか]
             self.conv1_1 = nn.Conv2d(n_input_channels, channels[0], kernels[0])
             nn.init.kaiming_normal_(self.conv1_1.weight)
             self.conv1_2 = nn.Conv2d(channels[0], channels[1], kernels[1])
@@ -728,20 +714,19 @@ class Dueling_Q_Func_Optuna(nn.Module):
     
     def forward(self, state):
         if self.n_added_input:
-            img = state[:,:-self.n_added_input]
-            sen = state[:,-self.n_added_input:]
-            # img = F.reshape(img,(-1,self.n_input_channels, self.img_width, self.img_height))
+            img = state[:, :-self.n_added_input]
+            sen = state[:, -self.n_added_input:]
         else:
             img = state
         
-        img = torch.reshape(img,(-1,self.n_input_channels, self.img_width, self.img_height))
+        img = torch.reshape(img, (-1, self.n_input_channels, self.img_width, self.img_height))
 
         #convolution
         if self.conv_num == 1:
             h = self.cnv_act(self.conv1_1(img))
             h = self.cnv_act(self.conv1_2(h))
             h = self.pool(h)
-            h = h.view(-1,self.img_input)
+            h = h.view(-1, self.img_input)
         elif self.conv_num == 2:
             h = self.cnv_act(self.conv1_1(img))
             h = self.cnv_act(self.conv1_2(h))
@@ -749,7 +734,7 @@ class Dueling_Q_Func_Optuna(nn.Module):
             h = self.cnv_act(self.conv2_1(h))
             h = self.cnv_act(self.conv2_2(h))
             h = self.pool(h)
-            h = h.view(-1,self.img_input)
+            h = h.view(-1, self.img_input)
         elif self.conv_num == 3:
             h = self.cnv_act(self.conv1_1(img))
             h = self.cnv_act(self.conv1_2(h))
@@ -760,10 +745,10 @@ class Dueling_Q_Func_Optuna(nn.Module):
             h = self.cnv_act(self.conv3_1(h))
             h = self.cnv_act(self.conv3_2(h))
             h = self.pool(h)
-            h = h.view(-1,self.img_input)
+            h = h.view(-1, self.img_input)
         
         if self.n_added_input:
-            h = torch.cat((h,sen), axis=1)
+            h = torch.cat((h, sen), axis=1)
 
         #全結合層の構成
         if self.mid_layer_num == 1:

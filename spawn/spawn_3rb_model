@@ -239,14 +239,14 @@ class SpawnModelNode():
         except rospy.ServiceException as e:
             rospy.logerr("Delete model service call failed: %s", e)
         
-    def data(self,xyzY):
+    def data(self, xyzY):
         self._delete_model()
         self.run(xyzY)
         pub_evalreset = rospy.Publisher('evalreset', Float32, queue_size=5)
         evalreset = Float32()
         evalreset.data = 1
-        # コネクションが3つ以上になるまで待機する。
-        while pub_evalreset.get_num_connections()<3:
+        # コネクションが3つ以上になるまで待機する。(ロボットの数以上になるまで)
+        while pub_evalreset.get_num_connections() < 3:
             rospy.sleep(0.1)
         pub_evalreset.publish(evalreset)
 

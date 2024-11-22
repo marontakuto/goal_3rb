@@ -4,21 +4,21 @@
   <arg name="second_tb3" default="tb3_1"/>
   <arg name="third_tb3"  default="tb3_2"/>
 
-  <!-- リスポーン時のロボットの位置と向き -->
-  <arg name="first_tb3_x_pos" default="-0.4"/>
-  <arg name="first_tb3_y_pos" default="1.4"/>
-  <arg name="first_tb3_z_pos" default=" 0.0"/>
-  <arg name="first_tb3_yaw"   default=" 0.0"/>
+  <!-- スポーン時のロボットの位置と向き -->
+  <arg name="first_tb3_x_pos" default="0.55"/>
+  <arg name="first_tb3_y_pos" default="0.35"/>
+  <arg name="first_tb3_z_pos" default="0.02"/>
+  <arg name="first_tb3_yaw"   default="2.355"/>
 
-  <arg name="second_tb3_x_pos" default=" 0.4"/>
-  <arg name="second_tb3_y_pos" default="1.4"/>
-  <arg name="second_tb3_z_pos" default=" 0.0"/>
-  <arg name="second_tb3_yaw"   default=" -1.57"/>
+  <arg name="second_tb3_x_pos" default="0.55"/>
+  <arg name="second_tb3_y_pos" default="1.45"/>
+  <arg name="second_tb3_z_pos" default="0.02"/>
+  <arg name="second_tb3_yaw"   default="-2.355"/>
 
-  <arg name="third_tb3_x_pos" default=" 0.4"/>
-  <arg name="third_tb3_y_pos" default=" 0.4"/>
-  <arg name="third_tb3_z_pos" default=" 0.0"/>
-  <arg name="third_tb3_yaw"   default=" 3.14"/>
+  <arg name="third_tb3_x_pos" default="-0.55"/>
+  <arg name="third_tb3_y_pos" default="1.45"/>
+  <arg name="third_tb3_z_pos" default="0.02"/>
+  <arg name="third_tb3_yaw"   default="-0.785"/>
 
   <!-- ワールドの指定 -->
   <include file="$(find gazebo_ros)/launch/empty_world.launch">
@@ -39,7 +39,7 @@
       <param name="tf_prefix" value="$(arg first_tb3)" />
     </node>
     
-    <node name="multi_spawn_model" pkg="turtlebot3_dqn" type="multi_spawn_model" args="-urdf -model $(arg first_tb3) -x $(arg first_tb3_x_pos) -y $(arg first_tb3_y_pos) -z $(arg first_tb3_z_pos) -Y $(arg first_tb3_yaw) -param robot_description" />
+    <node name="spawn_3rb_model" pkg="turtlebot3_dqn" type="spawn_3rb_model" args="-urdf -model $(arg first_tb3) -x $(arg first_tb3_x_pos) -y $(arg first_tb3_y_pos) -z $(arg first_tb3_z_pos) -Y $(arg first_tb3_yaw) -param robot_description" />
   </group>
 
   <!-- ロボット1の設定 -->
@@ -51,7 +51,7 @@
       <param name="tf_prefix" value="$(arg second_tb3)" />
     </node>
 
-    <node name="multi_spawn_model" pkg="turtlebot3_dqn" type="multi_spawn_model" args="-urdf -model $(arg second_tb3) -x $(arg second_tb3_x_pos) -y $(arg second_tb3_y_pos) -z $(arg second_tb3_z_pos) -Y $(arg second_tb3_yaw) -param robot_description" />
+    <node name="spawn_3rb_model" pkg="turtlebot3_dqn" type="spawn_3rb_model" args="-urdf -model $(arg second_tb3) -x $(arg second_tb3_x_pos) -y $(arg second_tb3_y_pos) -z $(arg second_tb3_z_pos) -Y $(arg second_tb3_yaw) -param robot_description" />
   </group>
 
   <!-- ロボット2の設定 -->
@@ -63,6 +63,7 @@
       <param name="tf_prefix" value="$(arg third_tb3)" />
     </node>
 
-    <node name="multi_spawn_model" pkg="turtlebot3_dqn" type="multi_spawn_model" args="-urdf -model $(arg third_tb3) -x $(arg third_tb3_x_pos) -y $(arg third_tb3_y_pos) -z $(arg third_tb3_z_pos) -Y $(arg third_tb3_yaw) -param robot_description" />
+    <node name="spawn_3rb_model" pkg="turtlebot3_dqn" type="spawn_3rb_model" args="-urdf -model $(arg third_tb3) -x $(arg third_tb3_x_pos) -y $(arg third_tb3_y_pos) -z $(arg third_tb3_z_pos) -Y $(arg third_tb3_yaw) -param robot_description" />
   </group>
+
 </launch>

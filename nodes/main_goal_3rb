@@ -5,17 +5,14 @@
 
 import rospy
 import os
-import json
 import numpy as np
 import pandas as pd
-import random
 import time
 import sys
 sys.path.append(os.path.dirname(os.path.abspath(os.path.dirname(__file__))))
-from collections import deque
-from std_msgs.msg import Float32MultiArray, Int32MultiArray, Float32, Int32
 from datetime import datetime
 import torch.nn.functional as F # 活性化関数
+import sqlite3
 # 強化学習ライブラリ
 import pfrl
 import torch
@@ -48,18 +45,22 @@ class ReinforceAgent():
         self.exploration = 'd_egreedy' # d_egreedy(decay_epsilon_greedy) or c_egreedy(constant_epsilon_greedy)
         self.lidar_num = 36 # DQNに入力するlidarの方向数
         self.action_size = 4 # 行動の種類数
-        self.episode = 45 # 40
-        self.eval_episode = 6 # 4
+        self.episode = 40 # 40
+        self.eval_episode = 6 # 6
         self.episode_step = 500 # 500
-        self.test_step = 500 # 500
+        self.test_step = 200 # 200
         self.target_update = 500 # 500
         self.multistep = 2
         self.discount_factor = 0.9 # 割引率 0.9
-        self.replay_start_size = 500 # 初期探索 1000
+        self.replay_start_size = 500 # 初期探索 500
         self.gpu = 0 # ON:0, OFF:-1
 
         ### 自ら作成した変数 ###
-        self.screen_list = [2] # 学習経過を出力するロボットの選択([0, 1] → robot0とrobot1の内容を出力)
+        self.mask_switch = True # 目標ゴールを緑に, 他のゴールを黒に変換
+        self.display_image_normal = False # 加工していない画像の表示
+        self.display_image_mask = False # マスク処理した画像の表示
+        self.display_rb = [2] # カメラ画像を出力するロボットの識別番号
+        self.screen_list = [2] # 学習経過を出力するロボットの識別番号
         self.recovery = True # リカバリー方策を適用するか否か
         self.teleport = True # 衝突時は空いたスペースに再配置する
         self.termination_e = 999 # ロボットがフィールド外の左側に存在したら強制終了を始めるエピソード(最初のエピソードから行っていると無駄な計算量が出る)
@@ -71,14 +72,14 @@ class ReinforceAgent():
         ########################
 
         ### オプション有無の実験 ###
-        if trials >= 5:
-            self.teleport = False
+        # if trials >= 5:
+        #     self.mask_switch = False
         ############################
 
         #######################################################################################
 
         # ロボットの番号割振り
-        self.robot_n = rospy.get_param('robot_num') # 0~2:multi, 99:solo
+        self.robot_n = rospy.get_param('robot_num') # 0~3:multi, 99:solo
         if self.robot_n == 99: # solo
             self.robot_n = 1
         
@@ -218,7 +219,7 @@ class ReinforceAgent():
         df.to_excel(file_name, index=False)
 
     # 学習
-    def train(self, env, f_train_name, trials):
+    def train(self):
 
         # 使用するモデルのロード
         if self.load_model:
@@ -231,7 +232,7 @@ class ReinforceAgent():
         if self.mode == 'sim':
             env.set_robot(0) # 初期位置に配置
 
-        if (0 in self.screen_list and self.robot_n == 0) or (1 in self.screen_list and self.robot_n == 1) or (2 in self.screen_list and self.robot_n == 2):
+        if self.robot_n in self.screen_list:
             print('start train (robot' + str(self.robot_n) + ')')
         
         old_score = []
@@ -256,8 +257,6 @@ class ReinforceAgent():
                 
                 action = self.model.act(state) # モデルに状態を渡して取るべき行動を算出
 
-                deceleration = 1
-
                 ##### shielding(リカバリー方策) #####
                 if self.recovery and t >= 2:
                     if color_num < 100:
@@ -265,7 +264,7 @@ class ReinforceAgent():
                     pass
                 #####################################
 
-                next_state, reward, color_num, just_count, collision, _, input_scan = env.step(action, deceleration, test=False) # 行動、状態の観測、報酬の一連の処理
+                next_state, reward, color_num, just_count, collision, _, input_scan = env.step(action, test=False) # 行動、状態の観測、報酬の一連の処理
                 next_state = torch.from_numpy(next_state).float()
                 self.model.observe(next_state, reward, collision, reset=False) # モデルの更新
 
@@ -287,7 +286,7 @@ class ReinforceAgent():
                     h, m = divmod(m, 60)
 
                     # 結果の出力
-                    if (0 in self.screen_list and self.robot_n == 0) or (1 in self.screen_list and self.robot_n == 1) or (2 in self.screen_list and self.robot_n == 2):
+                    if self.robot_n in self.screen_list:
                         print('Ep: {} score: {:.2f} collision: {} goal: {} time: {}:{:02d}:{:02d}'.format(
                               e, score, collisions, r_just_count, h, m, s))
 
@@ -360,9 +359,9 @@ class ReinforceAgent():
         return test_episodes
 
     # テスト
-    def evaluate(self, env, test_e, f_test_name, f_evaluate_name, trials):
+    def evaluate(self, test_e):
 
-        if (0 in self.screen_list and self.robot_n == 0) or (1 in self.screen_list and self.robot_n == 1) or (2 in self.screen_list and self.robot_n == 2):
+        if self.robot_n in self.screen_list:
             print('start episode ' + str(test_e) + ' test (robot ' + str(self.robot_n) +')')
         
         old_score = []
@@ -404,16 +403,14 @@ class ReinforceAgent():
 
                     action = self.model.act(state)
 
-                    deceleration = 1
-
                     ##### shielding(リカバリー方策) #####
                     if self.recovery and t >= 2:
-                        # if color_num < 100:
-                        #     action = env.recovery_change_action(test_e, input_scan, self.lidar_num, action, state, self.model.model) # LiDARの数値が低い方向への行動を避ける
+                        if color_num < 100:
+                            action = env.recovery_change_action(test_e, input_scan, self.lidar_num, action, state, self.model.model) # LiDARの数値が低い方向への行動を避ける
                         pass
                     #####################################
 
-                    next_state, reward, color_num, just_count, collision, goal, input_scan = env.step(action, deceleration, test=True)
+                    next_state, reward, color_num, just_count, collision, goal, input_scan = env.step(action, test=True)
                     next_state = torch.from_numpy(next_state).float()
                     self.model.observe(next_state, reward, collision, reset=False)
 
@@ -436,7 +433,7 @@ class ReinforceAgent():
                         h, m = divmod(m, 60)
 
                         # 結果の出力
-                        if (0 in self.screen_list and self.robot_n == 0) or (1 in self.screen_list and self.robot_n == 1) or (2 in self.screen_list and self.robot_n == 2):
+                        if self.robot_n in self.screen_list:
                             print('Test: {} step: {} score: {:.2f} collision: {} goal: {} time: {}:{:02d}:{:02d}'.format(
                                   eval_e, t, score, collisions, r_just_count, h, m, s))
                         
@@ -502,7 +499,7 @@ class ReinforceAgent():
         return score
 
     # デモンストレーション
-    def demo(self, env):
+    def demo(self):
         
         # 使用するモデルのロード
         self.model.load(self.dirPath + '/load_model/robot_' + str(self.robot_n))
@@ -512,7 +509,7 @@ class ReinforceAgent():
         if self.mode == 'sim':
             env.set_robot(0)
 
-        if (0 in self.screen_list and self.robot_n == 0) or (1 in self.screen_list and self.robot_n == 1) or (2 in self.screen_list and self.robot_n == 2):
+        if self.robot_n in self.screen_list:
             print('\nstart show (robot' + str(self.robot_n) + ')')
         
         start_time = time.time()
@@ -536,8 +533,6 @@ class ReinforceAgent():
 
                     action = self.model.act(state)
 
-                    deceleration = 1
-
                     ##### shielding(リカバリー方策) #####
                     if self.recovery and t >= 2:
                         if color_num < 100:
@@ -545,7 +540,7 @@ class ReinforceAgent():
                         pass
                     #####################################
 
-                    next_state, reward, color_num, just_count, collision, goal, input_scan = env.step(action, deceleration, test=False)
+                    next_state, reward, color_num, just_count, collision, goal, input_scan = env.step(action, test=False)
                     next_state = torch.from_numpy(next_state).float()
                     self.model.observe(next_state, reward, collision, reset=False)
 
@@ -569,207 +564,185 @@ class ReinforceAgent():
                         h, m = divmod(m, 60)
 
                         # 結果の出力
-                        if (0 in self.screen_list and self.robot_n == 0) or (1 in self.screen_list and self.robot_n == 1) or (2 in self.screen_list and self.robot_n == 2):
+                        if self.robot_n in self.screen_list:
                             print('step: {} score: {:.2f} collision: {} goal: {} time: {}:{:02d}:{:02d}'.format(
                             step_total, score, collisions, r_just_count, h, m, s))
                         
                         break
 
 
-# メイン
-def summary(params):
-
-    if params: # Optunaで選定されたパラメータの定義
-        params = {
-            'network': params.data[0], 
-            'conv_num': params.data[1], 
-            'mid_layer_num': params.data[2], 
-            'mid_units1': params.data[3], 
-            'mid_units2': params.data[4], 
-            'mid_units3': params.data[5], 
-            'cnv_act': params.data[6], 
-            'ful_act': params.data[7], 
-            'optimizer': params.data[8], 
-            'batch_size': params.data[9], 
-            'r_collision': params.data[10], 
-            'r_just': params.data[11], 
-            'r_near': params.data[12], 
-            'r_goal': params.data[13], 
-            'r_cost': params.data[14], 
-            'Target': params.data[15], 
-            'trials': params.data[16]
-        }
-
-        network = params['network']
-        conv_num = params['conv_num']
-        mid_layer_num = params['mid_layer_num']
-        mid_units1 = int(params['mid_units1'])
-        mid_units2 = int(params['mid_units2'])
-        mid_units3 = int(params['mid_units3'])
-        cnv_act = params['cnv_act']
-        ful_act = params['ful_act']
-        optimizer = params['optimizer']
-        batch_size = int(params['batch_size'])
-        r_collision = params['r_collision']
-        r_just = params['r_just']
-        r_near = params['r_near']
-        r_goal = params['r_goal']
-        r_cost = params['r_cost']
-        Target = params['Target']
-        trials = int(params['trials'])
-
-        if network == 0:
-            network = 'CNN'
-        elif network == 1:
-            network = 'DCNN'
-        elif network == 1:
-            network = 'MLP'
-
-        if cnv_act == 0:
-            cnv_act = F.relu
-        elif cnv_act == 1:
-            cnv_act = F.elu
-        elif cnv_act == 2:
-            cnv_act = F.selu
-        elif cnv_act == 3:
-            cnv_act = F.leaky_relu
-        
-        if ful_act == 0:
-            ful_act = F.relu
-        elif ful_act == 1:
-            ful_act = F.elu
-        elif ful_act == 2:
-            ful_act = F.selu
-        elif ful_act == 3:
-            ful_act = F.leaky_relu
-        
-        if optimizer == 0:
-            optimizer = 'SGD'
-        elif optimizer == 1:
-            optimizer = 'MomentumSGD'
-        elif optimizer == 2:
-            optimizer = 'Adagrad'
-        elif optimizer == 3:
-            optimizer = 'RMSprop'
-        elif optimizer == 4:
-            optimizer = 'Adadelta'
-        elif optimizer == 5:
-            optimizer = 'Adam'
-        elif optimizer == 6:
-            optimizer = 'AdamW'
-        elif optimizer == 7:
-            optimizer = 'SparseAdam'
-        elif optimizer == 8:
-            optimizer = 'Adamax'
-        elif optimizer == 9:
-            optimizer = 'RAdam'
-        
-        if Target == 0:
-            Target = 'both'
-        elif Target == 1:
-            Target = 'network'
-        elif Target == 2:
-            Target = 'reward'
+def get_value_by_name(name): # データベースの情報を適切な型に直して参照する
+    cursor_to_main.execute('SELECT value FROM to_main WHERE name = ?', (name,))
+    result = cursor_to_main.fetchone()
     
+    if result and result[0] is not None:
+        value = result[0]
+        try:
+            float_value = float(value) # 値がfloatに変換可能なら試行
+            if float_value.is_integer(): # 小数点以下が0ならintに変換
+                return int(float_value)
+            return float_value
+        except ValueError:
+            try:
+                func = eval(value)
+                if callable(func):
+                    return func # 値が関数名の場合は実行可能な関数を返す
+                else:
+                    return value  # eval 結果が関数でない場合はそのまま返す
+            except (NameError, SyntaxError): # それ以外の場合はそのまま文字列として返す
+                return value
+    else:
+        return None
+
+
+# メイン
+if __name__ == '__main__':
+    rospy.init_node('main_goal_3rb')
+
     training = True # 学習の有無
     evaluation = True # テストの有無
     demonstration = False # デモンストレーションの有無
-
-    agent = ReinforceAgent(network, conv_num, mid_layer_num, mid_units1, mid_units2, 
-                           mid_units3, cnv_act, ful_act, optimizer, batch_size, Target, trials) # ReinforceAgentクラスのインスタンス化
-
-    env = Env(agent.mode, agent.robot_n, agent.lidar_num, agent.input_list, agent.teleport, 
-              r_collision, r_just, r_near, r_goal, r_cost, Target) # Envクラスのインスタンス化(environmentファイルのクラス)
-
-    #########記録ファイル作成########################################################
-    if training:
-        # 学習ファイル
-        f_train_file = os.path.dirname(os.path.realpath(__file__)) + '/score/'
-        f_train_name = f_train_file + str(agent.robot_n) + "_avoid_" + str(Target) + "_" + dtstr + "_train.xlsx"
-        # ディレクトリがない場合、作成する
-        if not os.path.exists(f_train_file):
-            os.makedirs(f_train_file)
-        if trials == 0 or trials == agent.trial_restart:
-            columns = ['trials', 'episodes', 'step', 'reward_sum', 'collisions', 'goal', 'time']
-            df = pd.DataFrame(columns=columns)
-            df.to_excel(f_train_name, index=False)
-        # トライアル数を書き込む
-        data = [[''], [str(trials)]]
-        columns = ['trials']
-        agent.excel(data, columns, f_train_name)
-    if evaluation:
-        # テストファイル
-        f_test_file =  os.path.dirname(os.path.realpath(__file__)) + '/score/'
-        f_test_name = f_test_file + str(agent.robot_n) + "_avoid_" + str(Target) + "_" + dtstr + "_test.xlsx"
-        # ディレクトリがない場合、作成する
-        if not os.path.exists(f_test_file):
-            os.makedirs(f_test_file)
-        if trials == 0 or trials == agent.trial_restart:
-            columns = ['trials', 'episodes', 'step', 'reward_sum', 'collisions', 'goal', 'time']
-            df = pd.DataFrame(columns=columns)
-            df.to_excel(f_test_name, index=False)
-        # トライアル数を書き込む
-        data = [[''], [str(trials)]]
-        columns = ['trials']
-        agent.excel(data, columns, f_test_name)
-
-        # 評価ファイル
-        f_evaluate_file =  os.path.dirname(os.path.realpath(__file__)) + '/score/'
-        f_evaluate_name = f_evaluate_file + str(agent.robot_n) + "_avoid_" + str(Target) + "_" + dtstr + "_evaluate.xlsx"
-        # ディレクトリがない場合、作成する
-        if not os.path.exists(f_evaluate_file):
-            os.makedirs(f_evaluate_file)
-        if trials == 0 or trials == agent.trial_restart:
-            columns = ['trials', 'episodes', 'step_ave', 'collisions_ave', 'goal_ave', 'evaluation']
-            df = pd.DataFrame(columns=columns)
-            df.to_excel(f_evaluate_name, index=False)
-        # トライアル数を書き込む
-        data = [[''], [str(trials)]]
-        columns = ['trials']
-        agent.excel(data, columns, f_evaluate_name)
-    ################################################################################
-    
-    #########ロボットの学習・テスト・デモ#################
-    if training: # 学習の実行
-        test_episodes = agent.train(env, f_train_name, trials)
-        score_list = [0, 0, 0]
-    if evaluation: # テストの実行
-        score_list = []
-        if 'test_episodes' not in locals():
-            test_episodes = [999, 999, 999]
-        for test_e in test_episodes:
-            score = agent.evaluate(env, test_e, f_test_name, f_evaluate_name, trials)
-            score_list.append(score)
-    if demonstration: # デモンストレーションの実行
-        agent.demo(env)
-        score_list = [0, 0, 0]
-    #######################################################
-    
-    score_list = score_list[-3:] # 評価リストの後方3つを採用する
-    score_list.insert(0, agent.robot_n) # リストの先頭にロボット番号を追加
-
-    # トピックの受け取りミスを防ぐためのディレイ
-    if agent.robot_n == 1:
-        time.sleep(2)
-    if agent.robot_n == 2:
-        time.sleep(4)
-
-    # turtlebot3_3robot_optunaのscoreトピックに結果を送信
-    pub_baton = rospy.Publisher('score', Float32MultiArray, queue_size=5)
-    baton = Float32MultiArray()
-    baton.data = score_list # [agent.robot_n, score_1st_last, score_2nd_last, score_3rd_last]
-    while pub_baton.get_num_connections() < 1:
-        pass
-    pub_baton.publish(baton)
-
-
-# トピックの受け取り
-if __name__ == '__main__':
-    rospy.init_node('turtlebot3_3robot_avoid_main')
+    load_test_num = 3 # ロードしたモデルでテストする回数(training = False, evaluation = True の場合) ※3以上必須
 
     # 実験開始時間の取得
     dt = datetime.now() # 現在時刻の取得
     dtstr = dt.strftime('%m_%d_%H:%M:%S') # y(year), m(month), d(day), H(hour), M(minute), S(second)
 
-    sub_state = rospy.Subscriber('baton', Float32MultiArray, summary, queue_size=10) # summaryメソッドへ
-    rospy.spin() # ノードを走らせ続ける
+    to_main_db_name = os.path.dirname(os.path.realpath(__file__)) + "/score/to_main.db"
+
+    while True: # 全トライアルの処理が終わるまでループ
+
+        # データベースファイルが作成されたら処理を進める
+        while True:
+            if os.path.exists(os.path.dirname(to_main_db_name)):
+                if os.path.exists(to_main_db_name):
+                    break
+            time.sleep(0.1)
+
+        # パラメータがセットされたら処理を進める
+        to_main = sqlite3.connect(to_main_db_name)
+        cursor_to_main = to_main.cursor()
+        while True:
+            cursor_to_main.execute('SELECT COUNT(*) FROM to_main WHERE is_set = 0')
+            if cursor_to_main.fetchone()[0] == 0:
+                break
+            time.sleep(0.1)
+
+        # 変数にデータを格納
+        network = get_value_by_name('network')
+        conv_num = get_value_by_name('conv_num')
+        mid_layer_num = get_value_by_name('mid_layer_num')
+        mid_units1 = get_value_by_name('mid_units1')
+        mid_units2 = get_value_by_name('mid_units2')
+        mid_units3 = get_value_by_name('mid_units3')
+        cnv_act = get_value_by_name('cnv_act')
+        ful_act = get_value_by_name('ful_act')
+        optimizer = get_value_by_name('optimizer')
+        batch_size = get_value_by_name('batch_size')
+        r_collision = get_value_by_name('r_collision')
+        r_just = get_value_by_name('r_just')
+        r_near = get_value_by_name('r_near')
+        r_goal = get_value_by_name('r_goal')
+        r_cost = get_value_by_name('r_cost')
+        r_passive = get_value_by_name('r_passive')
+        Target = get_value_by_name('Target')
+        trials = get_value_by_name('trials')
+        trial_size = get_value_by_name('trial_size')
+
+        agent = ReinforceAgent(network, conv_num, mid_layer_num, mid_units1, mid_units2, 
+                               mid_units3, cnv_act, ful_act, optimizer, batch_size, Target, 
+                               trials)
+
+        env = Env(agent.mode, agent.robot_n, agent.lidar_num, agent.input_list, 
+                  agent.teleport, r_collision, r_just, r_near, r_goal, r_cost, r_passive, 
+                  Target, agent.mask_switch, agent.display_image_normal, agent.display_image_mask, 
+                  agent.display_rb)
+
+        #########記録ファイル作成########################################################
+        if training:
+            # 学習ファイル
+            f_train_file = os.path.dirname(os.path.realpath(__file__)) + '/score/'
+            f_train_name = f_train_file + str(agent.robot_n) + "_goal_3rb_" + str(Target) + "_" + dtstr + "_train.xlsx"
+            # ディレクトリがない場合、作成する
+            if not os.path.exists(f_train_file):
+                os.makedirs(f_train_file)
+            if trials == 0 or trials == agent.trial_restart:
+                columns = ['trials', 'episodes', 'step', 'reward_sum', 'collisions', 'goal', 'time']
+                df = pd.DataFrame(columns=columns)
+                df.to_excel(f_train_name, index=False)
+            # トライアル数を書き込む
+            data = [[''], [str(trials)]]
+            columns = ['trials']
+            agent.excel(data, columns, f_train_name)
+        if evaluation:
+            # テストファイル
+            f_test_file =  os.path.dirname(os.path.realpath(__file__)) + '/score/'
+            f_test_name = f_test_file + str(agent.robot_n) + "_goal_3rb_" + str(Target) + "_" + dtstr + "_test.xlsx"
+            # ディレクトリがない場合、作成する
+            if not os.path.exists(f_test_file):
+                os.makedirs(f_test_file)
+            if trials == 0 or trials == agent.trial_restart:
+                columns = ['trials', 'episodes', 'step', 'reward_sum', 'collisions', 'goal', 'time']
+                df = pd.DataFrame(columns=columns)
+                df.to_excel(f_test_name, index=False)
+            # トライアル数を書き込む
+            data = [[''], [str(trials)]]
+            columns = ['trials']
+            agent.excel(data, columns, f_test_name)
+
+            # 評価ファイル
+            f_evaluate_file =  os.path.dirname(os.path.realpath(__file__)) + '/score/'
+            f_evaluate_name = f_evaluate_file + str(agent.robot_n) + "_goal_3rb_" + str(Target) + "_" + dtstr + "_evaluate.xlsx"
+            # ディレクトリがない場合、作成する
+            if not os.path.exists(f_evaluate_file):
+                os.makedirs(f_evaluate_file)
+            if trials == 0 or trials == agent.trial_restart:
+                columns = ['trials', 'episodes', 'step_ave', 'collisions_ave', 'goal_ave', 'evaluation']
+                df = pd.DataFrame(columns=columns)
+                df.to_excel(f_evaluate_name, index=False)
+            # トライアル数を書き込む
+            data = [[''], [str(trials)]]
+            columns = ['trials']
+            agent.excel(data, columns, f_evaluate_name)
+        ################################################################################
+        
+        #########ロボットの学習・テスト・デモ#################
+        if training:
+            test_episodes = agent.train() # 学習の実行
+            score_list = [0, 0, 0]
+        if evaluation:
+            score_list = []
+            if 'test_episodes' not in locals():
+                test_episodes = [999 for _ in range(load_test_num)]
+            for test_e in test_episodes:
+                score = agent.evaluate(test_e)  # テストの実行
+                score_list.append(score)
+        if demonstration:
+            agent.demo() # デモンストレーションの実行
+            score_list = [0, 0, 0]
+        if not training and not evaluation and not demonstration:
+            score_list = [100, 100, 100]
+            print('training/evaluation/demonstration のどれかをTrueにしてください!')
+            time.sleep(3)
+        #######################################################
+        
+        score_list = score_list[-3:] # 評価リストの後方3つを採用する
+
+        # データベースにあるパラメータ値の削除とsetフラグの解除
+        cursor_to_main.execute('''
+        UPDATE to_main
+        SET value = NULL, is_set = 0
+        ''')
+        to_main.commit()
+
+        # 結果格納用データベースに結果を格納
+        for data in score_list:
+            to_optuna = sqlite3.connect(os.path.dirname(os.path.realpath(__file__)) + "/score/to_optuna.db")
+            cursor_to_optuna = to_optuna.cursor()
+            cursor_to_optuna.execute("INSERT INTO to_optuna (process_id, data) VALUES (?, ?)", (agent.robot_n, data))
+            to_optuna.commit()
+            to_optuna.close()
+        
+        # 最後のトライアルでループを抜ける
+        if trials + 1 == trial_size:
+            break
