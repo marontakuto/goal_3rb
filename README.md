@@ -1,7 +1,7 @@
-# goal_4rb
+# goal_3rb
 
 Gazeboで群ロボットの回避行動の獲得を実現するためのリポジトリです。
-- ロボット4台
+- ロボット3台
 - turtlebot3 burger
 - Python 3.8.10
 - 深層強化学習
@@ -15,7 +15,7 @@ Gazeboで群ロボットの回避行動の獲得を実現するためのリポ�
 3. [9. Machine Learning]上部の「Kinetic」「Melodic」「Noetic」... より「Melodic」を選択し、9.1.5のコマンドを順番に入力する(numpyのコマンドは無視)
 4. [6. Simulation]6.1.2のコマンドを実行してワールドとturtlebot3 burgerが出力されればOK
 5. cd ~/catkin_ws/turtlebot3_learning_machine/turtlebot3_dqn
-6. git clone https://github.com/marontakuto/goal_4rb.git
+6. git clone https://github.com/marontakuto/goal_3rb.git
 7. ターミナルを2つ開く
 8. roslaunch turtlebot3_dqn world_goal_3rb.launch # 1つ目のターミナルで実行
 9. roslaunch turtlebot3_dqn exe_goal_3rb.launch # 2つ目のターミナルで実行
