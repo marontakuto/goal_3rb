@@ -64,6 +64,8 @@ class Env():
             self.goal_color = 'green'
         elif self.robot_n == 2:
             self.goal_color = 'yellow'
+        
+        self.previous_goal = None
 
     def get_lidar(self, retake=False): # lidar情報の取得
         if retake:
@@ -144,9 +146,42 @@ class Env():
         goal = False
         state_list = [] # 入力する情報を格納するリスト
 
+        ### 画像の取得と処理 ###
         img = self.get_camera() # カメラ画像の取得
         img, goal_num = self.goal_mask(img) # 目標ゴールを緑に, 他のゴールを黒に変換 + ゴールの画素数取得
+
+        if goal_num > 300:
+            goal = True
+
+            # 1step前もゴールだった場合は前回と同じ画像を読み込んでいる可能性があるため再度画像取得する
+            if self.previous_goal:
+                while goal_num > 300:
+                    img = self.get_camera(retake=True)
+                    img, goal_num = self.goal_mask(img)
+                goal = False
+
+            # 目標のゴールを反対側のゴールに設定
+            if goal and not self.teleport:
+                if self.goal_color == 'red':
+                    self.goal_color = 'green'
+                elif self.goal_color == 'green':
+                    self.goal_color = 'red'
+                elif self.goal_color == 'yellow':
+                    self.goal_color = 'purple'
+                elif self.goal_color == 'purple':
+                    self.goal_color = 'yellow'
+        
+        self.previous_goal = goal
+        
+        #### LiDAR情報の取得と処理 ###
         scan = self.get_lidar() # LiDAR値の取得
+
+        if self.range_margin >= min(scan):
+            collision = True
+            if self.mode == 'real': # 実機実験におけるLiDARの飛び値の処理
+                scan_true = [element_cont for element_num, element_cont in enumerate(scan) if element_cont != 0]
+                if scan.count(0) >= 1 and self.range_margin < min(scan_true): # (飛び値が存在する)and(飛び値を除いた場合は衝突判定ではない)
+                    collision = False
         
         # 入力するカメラ画像の処理
         if ('cam' in self.input_list) or ('previous_cam' in self.input_list) or ('previous2_cam' in self.input_list):
@@ -193,29 +228,6 @@ class Env():
                     past_scan = self.previous2_lidar_list[0] # 2step前のLiDAR値
                     state_list = state_list + past_scan # [画像] + [現在 1step前 2step前]
         
-        # LiDAR値による衝突判定
-        if self.range_margin >= min(scan):
-            collision = True
-            if self.mode == 'real': # 実機実験におけるLiDARの飛び値の処理
-                scan_true = [element_cont for element_num, element_cont in enumerate(scan) if element_cont != 0]
-                if scan.count(0) >= 1 and self.range_margin < min(scan_true): # (飛び値が存在する)and(飛び値を除いた場合は衝突判定ではない)
-                    collision = False
-        
-        # 画像情報によるゴール判定
-        if goal_num > 300:
-            goal = True
-
-            # 目標のゴールを反対側のゴールに設定
-            if not self.teleport:
-                if self.goal_color == 'red':
-                    self.goal_color = 'green'
-                elif self.goal_color == 'green':
-                    self.goal_color = 'red'
-                elif self.goal_color == 'yellow':
-                    self.goal_color = 'purple'
-                elif self.goal_color == 'purple':
-                    self.goal_color = 'yellow'
-        
         return state_list, scan, input_scan, collision, goal, goal_num
    
     def setReward(self, scan, collision, goal, goal_num,  action):
@@ -231,7 +243,7 @@ class Env():
                 just_count = 1
             elif collision:
                 reward -= self.r_collision
-            if action == 3:
+            if action in [3, 4]:
                 reward -= self.r_passive
             reward -= self.r_cost
             reward += goal_num * self.r_just
@@ -242,7 +254,7 @@ class Env():
                 just_count = 1
             elif collision:
                 reward -= 50 # r_collision
-            if action == 3:
+            if action in [3, 4]:
                 reward -= 50 # r_passive
             reward -= 10 # r_cost
             reward += goal_num * 1 # r_just
@@ -265,17 +277,21 @@ class Env():
             vel_cmd.linear.x = 0.15 # 直進方向[m/s]
             vel_cmd.angular.z = 1.57 # 回転方向 [rad/s]
         
-        elif action == 1: # 直進(高速)
-            vel_cmd.linear.x = 0.10 # 直進方向[m/s]
-            vel_cmd.angular.z = 0 # 回転方向[rad/s]
+        elif action == 1: # 直進
+            vel_cmd.linear.x = 0.10
+            vel_cmd.angular.z = 0
 
         elif action == 2: # 右折
-            vel_cmd.linear.x = 0.15 # 直進方向[m/s]
-            vel_cmd.angular.z = -1.57 # 回転方向[rad/s]
+            vel_cmd.linear.x = 0.15
+            vel_cmd.angular.z = -1.57
         
-        elif action == 3: # 停止
-            vel_cmd.linear.x = 0 # 直進方向[m/s]
-            vel_cmd.angular.z = 0 # 回転方向[rad/s]
+        elif action == 3: # 左旋回
+            vel_cmd.linear.x = 0
+            vel_cmd.angular.z = 1.57
+        
+        elif action == 4: # 右旋回
+            vel_cmd.linear.x = 0
+            vel_cmd.angular.z = -1.57
         
         self.pub_cmd_vel.publish(vel_cmd) # 実行
         state_list, scan, input_scan, collision, goal, goal_num = self.getState() # 状態観測
@@ -445,7 +461,8 @@ class Env():
         set_state = rospy.ServiceProxy('/gazebo/set_model_state', SetModelState)
         set_state(state_msg)
 
-        time.sleep(0.1) # 配置後すぐに行動させた場合は配置前の情報が使われることがあるため数秒待機
+        if 0 <= num <= 100 or 1001 <= num <= 1100:
+            time.sleep(0.1) # 配置後すぐに行動させた場合は配置前の情報が使われることがあるため数秒待機
 
     # 以降追加システム
     def goal_mask(self, img): # 目標ゴールを緑に, 他のゴールを黒に変換
@@ -650,7 +667,7 @@ class Env():
                 change_action = True
         if set(forward) & set(low_lidar) != set():
             bad_action.append(1)
-            if action == 1 or action == 3:
+            if action == 1:
                 change_action = True
         if set(right) & set(low_lidar) != set():
             bad_action.append(2)
