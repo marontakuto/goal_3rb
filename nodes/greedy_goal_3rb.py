@@ -180,36 +180,7 @@ class MyEpsilonGreedy(explorer.Explorer): #2021年改良版
         greedy_str = 'greedy' if greedy else 'non-greedy'
         self.logger.debug('t:%s a:%s %s', t, a, greedy_str)
         if t < self.replay_start_size:
-            actionnum = np.random.rand()
-            if self.action_size==4:
-                if actionnum < 0.25:
-                    a = 0
-                elif actionnum >= 0.25 and actionnum < 0.5:
-                    a = 1
-                elif actionnum >= 0.5 and actionnum < 0.75:
-                    a = 2
-                else:
-                    a = 3
-            elif self.action_size==3:
-                if actionnum < 0.25:
-                    a = 0
-                elif actionnum >= 0.25 and actionnum < 0.75:
-                    a = 1
-                else :
-                    a = 2
-            elif self.action_size==6:
-                if actionnum < 1/6:
-                    a = 0
-                elif actionnum >= 1/6 and actionnum < 2/6:
-                    a = 1
-                elif actionnum >= 2/6 and actionnum < 3/6:
-                    a = 2
-                elif actionnum >= 3/6 and actionnum < 4/6:
-                    a = 3
-                elif actionnum >= 4/6 and actionnum < 5/6:
-                    a = 4
-                else :
-                    a = 5 
+            a = np.random.randint(self.action_size) 
         return a
 
     def __repr__(self):
@@ -235,23 +206,7 @@ class MyConstantGreedy(explorer.Explorer): #ConstantGreedy
         greedy_str = 'greedy' if greedy else 'non-greedy'
         self.logger.debug('t:%s a:%s %s', t, a, greedy_str)
         if t < self.replay_start_size:
-            actionnum = np.random.rand()
-            if self.action_size==4:
-                if actionnum < 0.25:
-                    a = 0
-                elif actionnum >= 0.25 and actionnum < 0.5:
-                    a = 1
-                elif actionnum >= 0.5 and actionnum < 0.75:
-                    a = 2
-                else:
-                    a = 3
-            elif self.action_size==3:
-                if actionnum < 0.25:
-                    a = 0
-                elif actionnum >= 0.25 and actionnum < 0.75:
-                    a = 1
-                else :
-                    a = 2
+            a = np.random.randint(self.action_size)
         return a
 
     def __repr__(self):
