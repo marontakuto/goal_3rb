@@ -623,9 +623,9 @@ class Env():
         for rb in judge_robot:
             judge_list.append(area_coordinate[0] < rb[0] < area_coordinate[1] and area_coordinate[2] < rb[1] < area_coordinate[3])
         
-        if terms == 'hard' and (judge_list[0] and judge_list[1] and judge_list[2]): # 他の全ロボットがエリアに存在する時
+        if terms == 'hard' and (judge_list[0] and judge_list[1]): # 他の全ロボットがエリアに存在する時
             exist = True
-        elif terms == 'soft' and (judge_list[0] or judge_list[1] or judge_list[2]): # 他のロボットが1台でもエリアに存在する時
+        elif terms == 'soft' and (judge_list[0] or judge_list[1]): # 他のロボットが1台でもエリアに存在する時
             exist = True
 
         return exist
