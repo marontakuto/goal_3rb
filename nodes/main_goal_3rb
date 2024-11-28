@@ -72,8 +72,18 @@ class ReinforceAgent():
         ########################
 
         ### オプション有無の実験 ###
-        # if trials >= 5:
-        #     self.mask_switch = False
+        if trials >= 9:
+            self.action_size = 6
+            self.recovery = True
+        elif trials >= 6:
+            self.action_size = 4
+            self.recovery = True
+        elif trials >= 3:
+            self.action_size = 5
+            self.recovery = True
+        else:
+            self.action_size = 6
+            self.recovery = True
         ############################
 
         #######################################################################################
@@ -655,7 +665,7 @@ if __name__ == '__main__':
 
         env = Env(agent.mode, agent.robot_n, agent.lidar_num, agent.input_list, 
                   agent.teleport, r_collision, r_just, r_near, r_goal, r_cost, r_passive, 
-                  Target, agent.mask_switch, agent.display_image_normal, agent.display_image_mask, 
+                  Target, trials, agent.mask_switch, agent.display_image_normal, agent.display_image_mask, 
                   agent.display_rb)
 
         #########記録ファイル作成########################################################

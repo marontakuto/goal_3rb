@@ -22,7 +22,7 @@ import ros_numpy
 class Env():
     def __init__(self, mode, robot_n, lidar_num, input_list, teleport, 
                  r_collision, r_just, r_near, r_goal, r_cost, r_passive, 
-                 Target, mask_switch, display_image_normal, display_image_mask, 
+                 Target, trials, mask_switch, display_image_normal, display_image_mask, 
                  display_rb):
         
         self.mode = mode
@@ -51,6 +51,7 @@ class Env():
         self.r_cost = r_cost
         self.r_passive = r_passive
         self.Target = Target
+        self.trials = trials
 
         # LiDARについての設定
         self.lidar_max = 2 # 対象のworldにおいて取りうるlidarの最大値(simの貫通対策や正規化に使用)
@@ -292,6 +293,45 @@ class Env():
         elif action == 4: # 右旋回
             vel_cmd.linear.x = 0
             vel_cmd.angular.z = -1.57
+        
+
+        if self.trials >= 9:
+            if action == 3: # 左旋回
+                vel_cmd.linear.x = 0
+                vel_cmd.angular.z = 1.57
+            
+            elif action == 4: # 右旋回
+                vel_cmd.linear.x = 0
+                vel_cmd.angular.z = -1.57
+            
+            elif action == 5: # 後退
+                vel_cmd.linear.x = -0.10
+                vel_cmd.angular.z = 0
+        elif self.trials >= 6:
+            if action == 3: # 後退
+                vel_cmd.linear.x = -0.10
+                vel_cmd.angular.z = 0
+        elif self.trials >= 3:
+            if action == 3: # 左旋回
+                vel_cmd.linear.x = 0
+                vel_cmd.angular.z = 1.57
+            
+            elif action == 4: # 右旋回
+                vel_cmd.linear.x = 0
+                vel_cmd.angular.z = -1.57
+        else:
+            if action == 3: # 左旋回
+                vel_cmd.linear.x = 0
+                vel_cmd.angular.z = 1.57
+            
+            elif action == 4: # 右旋回
+                vel_cmd.linear.x = 0
+                vel_cmd.angular.z = -1.57
+            
+            elif action == 5: # 後退
+                vel_cmd.linear.x = -0.10
+                vel_cmd.angular.z = 0
+        
         
         self.pub_cmd_vel.publish(vel_cmd) # 実行
         state_list, scan, input_scan, collision, goal, goal_num = self.getState() # 状態観測
@@ -634,11 +674,26 @@ class Env():
     def recovery_change_action(self, e, input_scan, lidar_num, action, state, model): # LiDARの数値が低い方向への行動を避ける
 
         ### ユーザー設定パラメータ ###
-        threshold = 0.2 # 動きを変える距離(LiDAR値)[m]
+        threshold = 0.45 # 動きを変える距離(LiDAR値)[m]
         probabilistic = True # True: リカバリー方策を確率的に利用する, False: リカバリー方策を必ず利用する
         initial_probability = 1.0 # 最初の確率
-        finish_episode = 25 # 方策を適応する最後のエピソード
+        finish_episode = 20 # 方策を適応する最後のエピソード
         mode_change_episode = 11 # 行動変更のトリガーをLiDAR値からQ値に変えるエピソード
+        ############################
+
+        ### 設定変更の実験 ###
+        if self.trials >= 9:
+            probabilistic = False
+            finish_episode = 40
+        elif self.trials >= 6:
+            probabilistic = True
+            finish_episode = 40
+        elif self.trials >= 3:
+            probabilistic = True
+            finish_episode = 40
+        else:
+            probabilistic = True
+            finish_episode = 40
         ############################
 
         # リカバリー方策の利用判定
@@ -653,12 +708,14 @@ class Env():
         bad_action = []
 
         # 方向の定義
-        left = list(range(2, lidar_num // 4 + 1)) # LiDARの前方左側
-        forward = [0, 1, lidar_num - 1] # LiDARの前方とする要素番号(左右数度ずつ)
-        right = list(range(lidar_num * 3 // 4, lidar_num - 1)) # LiDARの前方右側
+        forward_deg = 40 # 正面とする角度の定義[deg]
+        lidar_deg = 360 // lidar_num # 1要素間の角度[deg]
+        forward = list(range(0, (forward_deg // 2) // lidar_deg + 1)) # LiDARの正面とする要素番号
+        left = list(range((forward_deg // 2) // lidar_deg + 1, lidar_num // 4 + 1)) # LiDARの前方左側
+        right = list(range(lidar_num * 3 // 4, lidar_num - ((forward_deg // 2) // lidar_deg))) # LiDARの前方右側
 
         # LiDARのリストで条件に合う要素を格納したリストをインスタンス化(element_num:要素番号, element_cont:要素内容)
-        low_lidar = [element_num for element_num, element_cont in enumerate(input_scan) if element_cont <= threshold]
+        low_lidar = [element_num for element_num, element_cont in enumerate(self.scan) if element_cont <= threshold]
 
         # 指定したリストと条件に合う要素のリストで同じ数字があった場合は行動を変更する(actionを 0は左折, 1は直進, 2は右折 に設定する必要あり)
         if set(left) & set(low_lidar) != set():
