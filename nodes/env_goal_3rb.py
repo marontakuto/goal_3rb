@@ -309,7 +309,7 @@ class Env():
     def reset(self):
         self.img = None
         self.scan = None
-        state_list, _, _, _, _, _ = self.getState()
+        state_list, _, _, _, _ = self.getState()
         return np.array(state_list)
     
     def restart(self): # 障害物から離れるように動いて安全を確保
