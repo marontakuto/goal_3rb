@@ -229,7 +229,7 @@ class Env():
                     past_scan = self.previous2_lidar_list[0] # 2step前のLiDAR値
                     state_list = state_list + past_scan # [画像] + [現在 1step前 2step前]
         
-        return state_list, scan, input_scan, collision, goal, goal_num
+        return state_list, scan, collision, goal, goal_num
    
     def setReward(self, scan, collision, goal, goal_num,  action):
 
@@ -244,7 +244,7 @@ class Env():
                 just_count = 1
             elif collision:
                 reward -= self.r_collision
-            if action in [3, 4]:
+            if action in [3, 4, 5]:
                 reward -= self.r_passive
             reward -= self.r_cost
             reward += goal_num * self.r_just
@@ -334,7 +334,7 @@ class Env():
         
         
         self.pub_cmd_vel.publish(vel_cmd) # 実行
-        state_list, scan, input_scan, collision, goal, goal_num = self.getState() # 状態観測
+        state_list, scan, collision, goal, goal_num = self.getState() # 状態観測
         reward, color_num, just_count = self.setReward(scan, collision, goal, goal_num, action) # 報酬計算
 
         if not test: # テスト時でないときの処理
@@ -343,7 +343,7 @@ class Env():
             elif collision or goal:
                 self.relocation() # 空いているエリアへの再配置
         
-        return np.array(state_list), reward, color_num, just_count, collision, goal, input_scan
+        return np.array(state_list), reward, color_num, just_count, collision, goal
 
     def reset(self):
         self.img = None
@@ -671,7 +671,7 @@ class Env():
         return exist
 
     # 以降リカバリー方策
-    def recovery_change_action(self, e, input_scan, lidar_num, action, state, model): # LiDARの数値が低い方向への行動を避ける
+    def recovery_change_action(self, e, lidar_num, action, state, model): # LiDARの数値が低い方向への行動を避ける
 
         ### ユーザー設定パラメータ ###
         threshold = 0.45 # 動きを変える距離(LiDAR値)[m]
@@ -735,10 +735,10 @@ class Env():
         if change_action:
             if e < mode_change_episode: # LiDAR値による行動の変更
                 # 各方向のLiDAR値
-                front_scan = input_scan[0:left[-1] + 1] + input_scan[right[0]:lidar_num]
-                left_scan = input_scan[left[0]:left[-1] + 1]
-                forward_scan = input_scan[0:left[0]] + input_scan[right[-1] + 1:lidar_num]
-                right_scan = input_scan[right[0]:right[-1] + 1]
+                front_scan = self.scan[0:left[-1] + 1] + self.scan[right[0]:lidar_num]
+                left_scan = self.scan[left[0]:left[-1] + 1]
+                forward_scan = self.scan[0:left[0]] + self.scan[right[-1] + 1:lidar_num]
+                right_scan = self.scan[right[0]:right[-1] + 1]
                 scan_list = [left_scan, forward_scan, right_scan]
                 if len(bad_action) == 3: # 全方向のLiDAR値が低い場合はLiDAR値が最大の方向へ
                     if max(front_scan) in left_scan:

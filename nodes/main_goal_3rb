@@ -270,11 +270,11 @@ class ReinforceAgent():
                 ##### shielding(リカバリー方策) #####
                 if self.recovery and t >= 2:
                     if color_num < 100:
-                        action = env.recovery_change_action(e, input_scan, self.lidar_num, action, state, self.model.model) # LiDARの数値が低い方向への行動を避ける
+                        action = env.recovery_change_action(e, self.lidar_num, action, state, self.model.model) # LiDARの数値が低い方向への行動を避ける
                     pass
                 #####################################
 
-                next_state, reward, color_num, just_count, collision, _, input_scan = env.step(action, test=False) # 行動、状態の観測、報酬の一連の処理
+                next_state, reward, color_num, just_count, collision, _ = env.step(action, test=False) # 行動、状態の観測、報酬の一連の処理
                 next_state = torch.from_numpy(next_state).float()
                 self.model.observe(next_state, reward, collision, reset=False) # モデルの更新
 
@@ -416,11 +416,11 @@ class ReinforceAgent():
                     ##### shielding(リカバリー方策) #####
                     if self.recovery and t >= 2:
                         if color_num < 100:
-                            action = env.recovery_change_action(test_e, input_scan, self.lidar_num, action, state, self.model.model) # LiDARの数値が低い方向への行動を避ける
+                            action = env.recovery_change_action(test_e, self.lidar_num, action, state, self.model.model) # LiDARの数値が低い方向への行動を避ける
                         pass
                     #####################################
 
-                    next_state, reward, color_num, just_count, collision, goal, input_scan = env.step(action, test=True)
+                    next_state, reward, color_num, just_count, collision, goal = env.step(action, test=True)
                     next_state = torch.from_numpy(next_state).float()
                     self.model.observe(next_state, reward, collision, reset=False)
 
@@ -546,11 +546,11 @@ class ReinforceAgent():
                     ##### shielding(リカバリー方策) #####
                     if self.recovery and t >= 2:
                         if color_num < 100:
-                            action = env.recovery_change_action(1, input_scan, self.lidar_num, action, state, self.model.model) # LiDARの数値が低い方向への行動を避ける
+                            action = env.recovery_change_action(1, self.lidar_num, action, state, self.model.model) # LiDARの数値が低い方向への行動を避ける
                         pass
                     #####################################
 
-                    next_state, reward, color_num, just_count, collision, goal, input_scan = env.step(action, test=False)
+                    next_state, reward, color_num, just_count, collision, goal = env.step(action, test=False)
                     next_state = torch.from_numpy(next_state).float()
                     self.model.observe(next_state, reward, collision, reset=False)
 
