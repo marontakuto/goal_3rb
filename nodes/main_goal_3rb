@@ -43,9 +43,9 @@ class ReinforceAgent():
         self.input_list = ['lidar', 'cam', 'previous_lidar', 'previous_cam', 'previous2_lidar', 'previous2_cam'] # 'lidar', 'cam', 'previous_cam', 'previous_lidar', 'previous2_lidar', 'previous2_cam'
         self.net = network
         self.exploration = 'd_egreedy' # d_egreedy(decay_epsilon_greedy) or c_egreedy(constant_epsilon_greedy)
-        self.lidar_num = 36 # DQNに入力するlidarの方向数
+        self.lidar_num = 72 # DQNに入力するlidarの方向数
         self.action_size = 5 # 行動の種類数
-        self.episode = 40 # 40
+        self.episode = 50 # 40
         self.eval_episode = 6 # 6
         self.episode_step = 500 # 500
         self.test_step = 200 # 200
@@ -65,33 +65,31 @@ class ReinforceAgent():
         self.teleport = True # 衝突時は空いたスペースに再配置する
         self.termination_e = 999 # ロボットがフィールド外の左側に存在したら強制終了を始めるエピソード(最初のエピソードから行っていると無駄な計算量が出る)
         self.trial_restart = 999 # Optunaをロードして始めるトライアル
-        self.all_episode_test = True # すべてのエピソードをテスト
+        self.all_episode_test = False # すべてのエピソードをテスト
         self.synchro = True # エピソードごとの同期の有無
         if self.all_episode_test: # すべてのエピソードをテストする場合は必ず同期する
             self.synchro = True
         ########################
 
-        ### オプション有無の実験 ###
-        if trials >= 9:
-            self.action_size = 6
-            self.recovery = True
-        elif trials >= 6:
-            self.action_size = 4
-            self.recovery = True
-        elif trials >= 3:
-            self.action_size = 5
-            self.recovery = True
-        else:
-            self.action_size = 6
-            self.recovery = True
-        ############################
+        # ### オプション有無の実験 ###
+        # if trials >= 9:
+        #     self.action_size = 6
+        #     self.recovery = True
+        # elif trials >= 6:
+        #     self.action_size = 4
+        #     self.recovery = True
+        # elif trials >= 3:
+        #     self.action_size = 5
+        #     self.recovery = True
+        # else:
+        #     self.action_size = 6
+        #     self.recovery = True
+        # ############################
 
         #######################################################################################
 
-        # ロボットの番号割振り
-        self.robot_n = rospy.get_param('robot_num') # 0~3:multi, 99:solo
-        if self.robot_n == 99: # solo
-            self.robot_n = 1
+        # ロボットの番号割振り(launchファイルの「<param name="robot_num"  value="ここ"/>」から値を参照)
+        self.robot_n = rospy.get_param('robot_num')
         
         if self.gpu == 0: # GPU設定
             torch.set_default_dtype(torch.float32)

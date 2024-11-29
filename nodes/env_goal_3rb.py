@@ -244,7 +244,7 @@ class Env():
                 just_count = 1
             elif collision:
                 reward -= self.r_collision
-            if action in [3, 4, 5]:
+            if action in [3, 4]:
                 reward -= self.r_passive
             reward -= self.r_cost
             reward += goal_num * self.r_just
@@ -293,45 +293,6 @@ class Env():
         elif action == 4: # 右旋回
             vel_cmd.linear.x = 0
             vel_cmd.angular.z = -1.57
-        
-
-        if self.trials >= 9:
-            if action == 3: # 左旋回
-                vel_cmd.linear.x = 0
-                vel_cmd.angular.z = 1.57
-            
-            elif action == 4: # 右旋回
-                vel_cmd.linear.x = 0
-                vel_cmd.angular.z = -1.57
-            
-            elif action == 5: # 後退
-                vel_cmd.linear.x = -0.10
-                vel_cmd.angular.z = 0
-        elif self.trials >= 6:
-            if action == 3: # 後退
-                vel_cmd.linear.x = -0.10
-                vel_cmd.angular.z = 0
-        elif self.trials >= 3:
-            if action == 3: # 左旋回
-                vel_cmd.linear.x = 0
-                vel_cmd.angular.z = 1.57
-            
-            elif action == 4: # 右旋回
-                vel_cmd.linear.x = 0
-                vel_cmd.angular.z = -1.57
-        else:
-            if action == 3: # 左旋回
-                vel_cmd.linear.x = 0
-                vel_cmd.angular.z = 1.57
-            
-            elif action == 4: # 右旋回
-                vel_cmd.linear.x = 0
-                vel_cmd.angular.z = -1.57
-            
-            elif action == 5: # 後退
-                vel_cmd.linear.x = -0.10
-                vel_cmd.angular.z = 0
-        
         
         self.pub_cmd_vel.publish(vel_cmd) # 実行
         state_list, scan, collision, goal, goal_num = self.getState() # 状態観測
@@ -675,26 +636,26 @@ class Env():
 
         ### ユーザー設定パラメータ ###
         threshold = 0.45 # 動きを変える距離(LiDAR値)[m]
-        probabilistic = True # True: リカバリー方策を確率的に利用する, False: リカバリー方策を必ず利用する
+        probabilistic = False # True: リカバリー方策を確率的に利用する, False: リカバリー方策を必ず利用する
         initial_probability = 1.0 # 最初の確率
-        finish_episode = 20 # 方策を適応する最後のエピソード
+        finish_episode = 50 # 方策を適応する最後のエピソード
         mode_change_episode = 11 # 行動変更のトリガーをLiDAR値からQ値に変えるエピソード
         ############################
 
-        ### 設定変更の実験 ###
-        if self.trials >= 9:
-            probabilistic = False
-            finish_episode = 40
-        elif self.trials >= 6:
-            probabilistic = True
-            finish_episode = 40
-        elif self.trials >= 3:
-            probabilistic = True
-            finish_episode = 40
-        else:
-            probabilistic = True
-            finish_episode = 40
-        ############################
+        # ### 設定変更の実験 ###
+        # if self.trials >= 9:
+        #     probabilistic = False
+        #     finish_episode = 40
+        # elif self.trials >= 6:
+        #     probabilistic = True
+        #     finish_episode = 40
+        # elif self.trials >= 3:
+        #     probabilistic = True
+        #     finish_episode = 40
+        # else:
+        #     probabilistic = True
+        #     finish_episode = 40
+        # #######################
 
         # リカバリー方策の利用判定
         if not probabilistic and e <= finish_episode: # 必ず利用
