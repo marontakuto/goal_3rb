@@ -22,8 +22,7 @@ import net_goal_3rb # ネットワーク
 import greedy_goal_3rb # 探索手法
 
 class ReinforceAgent():
-    def __init__(self, network, conv_num, mid_layer_num, mid_units1, mid_units2, 
-                 mid_units3, cnv_act, ful_act, optimizer, batch_size, Target, trials):
+    def __init__(self):
 
         # モデルを保存するためのパス
         self.current_dirPath = os.path.dirname(os.path.realpath(__file__)) # カレントディレクトリのパス
@@ -34,14 +33,12 @@ class ReinforceAgent():
         self.mode = 'sim' # sim or real
         self.choice_model = False # dirPath/load_model/robot_n でテスト
 
-        self.save_model = False # 重みとリプレイバッファを保存するか
-        self.save_episode = 5 # (↑True時)重み保存を開始するエピソード
+        self.save_rbuf = False # リプレイバッファを保存するか(モデルは必ず保存されます)
         self.load_model = False # 保存した重みを適用するか
-        self.load_episode = 1 # (↑True時)適用する保存済重みのエピソード
-        self.load_rbuf = False
+        self.load_rbuf = False # 保存したリプレイバッファを適用するか
 
-        self.input_list = ['lidar', 'cam', 'previous_lidar', 'previous_cam', 'previous2_lidar', 'previous2_cam'] # 'lidar', 'cam', 'previous_cam', 'previous_lidar', 'previous2_lidar', 'previous2_cam'
-        self.net = network
+        # DQNへの入力(lidar: 現在のLiDAR値, previous_lidar: 1step前のLiDAR値, previous2_lidar: 2step前のLiDAR値, cam: 現在のカメラ画像)
+        self.input_list = ['lidar', 'cam', 'previous_lidar', 'previous_cam', 'previous2_lidar', 'previous2_cam']
         self.exploration = 'd_egreedy' # d_egreedy(decay_epsilon_greedy) or c_egreedy(constant_epsilon_greedy)
         self.lidar_num = 72 # DQNに入力するlidarの方向数
         self.action_size = 5 # 行動の種類数
@@ -64,7 +61,7 @@ class ReinforceAgent():
         self.recovery = True # リカバリー方策を適用するか否か
         self.teleport = True # 衝突時は空いたスペースに再配置する
         self.termination_e = 999 # ロボットがフィールド外の左側に存在したら強制終了を始めるエピソード(最初のエピソードから行っていると無駄な計算量が出る)
-        self.trial_restart = 999 # Optunaをロードして始めるトライアル
+        self.trial_restart = 60 # Optunaをロードして始めるトライアル
         self.all_episode_test = False # すべてのエピソードをテスト
         self.synchro = True # エピソードごとの同期の有無
         if self.all_episode_test: # すべてのエピソードをテストする場合は必ず同期する
@@ -95,7 +92,7 @@ class ReinforceAgent():
             torch.set_default_dtype(torch.float32)
             torch.set_default_device('cuda' if torch.cuda.is_available() else 'cpu')
         
-        if self.net == 'CNN':
+        if network == 'CNN':
             self.n_added_input = 0
             self.n_input_channels = 3
             assert ('cam'in self.input_list) or ('previous_cam'in self.input_list) or ('previous2_cam'in self.input_list), 'cam not in input_list' 
@@ -119,7 +116,7 @@ class ReinforceAgent():
                 self.q_func = net_goal_3rb.Q_Func(n_actions=self.action_size, 
                 n_input_channels=self.n_input_channels, n_added_input=self.n_added_input)
         
-        if self.net == 'DCNN':
+        if network == 'DCNN':
             self.n_added_input = 0
             self.n_input_channels = 3
             assert ('cam'in self.input_list) or ('previous_cam'in self.input_list) or ('previous2_cam'in self.input_list), 'cam not in input_list' 
@@ -144,7 +141,7 @@ class ReinforceAgent():
                     n_actions=self.action_size, n_input_channels=self.n_input_channels, n_added_input=self.n_added_input
                 )
 
-        if self.net == 'MLP':
+        if network == 'MLP':
             self.n_input = 0
             self.n_added_input = 0
             if ('cam'in self.input_list) or ('previous_cam'in self.input_list):
@@ -187,8 +184,6 @@ class ReinforceAgent():
             self.optimizer = torch.optim.Adamax(self.q_func.parameters())
         elif optimizer == 'RAdam':
             self.optimizer = torch.optim.RAdam(self.q_func.parameters())
-        
-        self.batch_size = batch_size
 
         if self.exploration == 'd_egreedy': # εが減衰
             self.explorer = greedy_goal_3rb.MyEpsilonGreedy(
@@ -215,7 +210,7 @@ class ReinforceAgent():
             self.q_func, optimizer=self.optimizer, replay_buffer=self.rbuf, 
             gamma=self.discount_factor, explorer=self.explorer, 
             gpu=self.gpu, replay_start_size=self.replay_start_size, 
-            minibatch_size=self.batch_size, update_interval=1, 
+            minibatch_size=batch_size, update_interval=1, 
             target_update_interval=self.target_update, n_times_update=1
         )
 
@@ -261,13 +256,15 @@ class ReinforceAgent():
             color_count = 0
             r_just_count = 0
 
+            turning_num = 0
+
             for t in range(1, self.episode_step + 1):
                 
                 action = self.model.act(state) # モデルに状態を渡して取るべき行動を算出
 
                 ##### shielding(リカバリー方策) #####
                 if self.recovery and t >= 2:
-                    if color_num < 100:
+                    if color_num < 50:
                         action = env.recovery_change_action(e, self.lidar_num, action, state, self.model.model) # LiDARの数値が低い方向への行動を避ける
                     pass
                 #####################################
@@ -280,6 +277,9 @@ class ReinforceAgent():
                 color_count += color_num
                 score += reward
                 state = next_state
+
+                if action in [3, 4]:
+                    turning_num += 1
 
                 # 衝突時の処理
                 if collision:
@@ -299,7 +299,7 @@ class ReinforceAgent():
                               e, score, collisions, r_just_count, h, m, s))
 
                     # 結果の記録
-                    data = [[str(e), str(t), str(score), str(collisions), str(r_just_count), str(h) + ':' + str(m) + ':' + str(s)]]
+                    data = [[str(e), str(turning_num), str(score), str(collisions), str(r_just_count), str(h) + ':' + str(m) + ':' + str(s)]]
                     columns = ['episodes', 'step', 'reward_sum', 'collisions', 'goal', 'time']
                     data = pd.DataFrame(data, columns=columns)
                     self.excel(data, columns, f_train_name)
@@ -319,12 +319,9 @@ class ReinforceAgent():
                         break
             
             # モデルの保存
-            if self.save_model and e >= self.save_episode:
-                self.model.save(self.dirPath + '/TRIAL' + str(trials) + '/episode' + str(e) + '/robot_' + str(self.robot_n))
-                self.rbuf.save(self.dirPath + '/TRIAL' + str(trials) + '/episode' + str(e) + '/robot_' + str(self.robot_n) + '/replay_buffer')
-            else:
-                self.model.save(self.dirPath + '/TRIAL' + str(trials) + '/episode' + str(e) + '/robot_' + str(self.robot_n))
-                # self.rbuf.save(self.dirPath + '/TRIAL' + str(trials) + '/episode' + str(e) + '/robot_' + str(self.robot_n) + '/replay_buffer')
+            if self.save_rbuf:
+                self.rbuf.save(self.dirPath + '/TRIAL' + str(trials) + '/episode' + str(e) + '/robot_' + str(self.robot_n) + '/replay_buffer') # リプレイバッファの保存
+            self.model.save(self.dirPath + '/TRIAL' + str(trials) + '/episode' + str(e) + '/robot_' + str(self.robot_n)) # モデルの保存
             
             # エピソードごとの同期(他ロボットが右のエリアにいることを確認することで同期を取る)
             if self.synchro and e != self.episode:
@@ -413,7 +410,7 @@ class ReinforceAgent():
 
                     ##### shielding(リカバリー方策) #####
                     if self.recovery and t >= 2:
-                        if color_num < 100:
+                        if color_num < 50:
                             action = env.recovery_change_action(test_e, self.lidar_num, action, state, self.model.model) # LiDARの数値が低い方向への行動を避ける
                         pass
                     #####################################
@@ -543,7 +540,7 @@ class ReinforceAgent():
 
                     ##### shielding(リカバリー方策) #####
                     if self.recovery and t >= 2:
-                        if color_num < 100:
+                        if color_num < 50:
                             action = env.recovery_change_action(1, self.lidar_num, action, state, self.model.model) # LiDARの数値が低い方向への行動を避ける
                         pass
                     #####################################
@@ -657,14 +654,12 @@ if __name__ == '__main__':
         trials = get_value_by_name('trials')
         trial_size = get_value_by_name('trial_size')
 
-        agent = ReinforceAgent(network, conv_num, mid_layer_num, mid_units1, mid_units2, 
-                               mid_units3, cnv_act, ful_act, optimizer, batch_size, Target, 
-                               trials)
+        agent = ReinforceAgent()
 
         env = Env(agent.mode, agent.robot_n, agent.lidar_num, agent.input_list, 
-                  agent.teleport, r_collision, r_just, r_near, r_goal, r_cost, r_passive, 
-                  Target, trials, agent.mask_switch, agent.display_image_normal, agent.display_image_mask, 
-                  agent.display_rb)
+                  agent.teleport, r_collision, r_just, r_near, r_goal, r_cost, 
+                  r_passive, Target, trials, agent.mask_switch, agent.display_image_normal, 
+                  agent.display_image_mask, agent.display_rb)
 
         #########記録ファイル作成########################################################
         if training:
