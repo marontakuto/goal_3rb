@@ -61,7 +61,6 @@ class ReinforceAgent():
         self.recovery = True # リカバリー方策を適用するか否か
         self.teleport = True # 衝突時は空いたスペースに再配置する
         self.termination_e = 999 # ロボットがフィールド外の左側に存在したら強制終了を始めるエピソード(最初のエピソードから行っていると無駄な計算量が出る)
-        self.trial_restart = 60 # Optunaをロードして始めるトライアル
         self.all_episode_test = False # すべてのエピソードをテスト
         self.synchro = True # エピソードごとの同期の有無
         if self.all_episode_test: # すべてのエピソードをテストする場合は必ず同期する
@@ -612,7 +611,42 @@ if __name__ == '__main__':
     # 実験開始時間の取得
     dt = datetime.now() # 現在時刻の取得
     dtstr = dt.strftime('%m_%d_%H:%M:%S') # y(year), m(month), d(day), H(hour), M(minute), S(second)
+    
+    robot_n = rospy.get_param('robot_num') # ロボットの番号割振り(launchファイルの「<param name="robot_num"  value="ここ"/>」から値を参照)
 
+    # 記録ファイル作成
+    if training:
+        # 学習ファイル
+        f_train_file = os.path.dirname(os.path.realpath(__file__)) + '/score/'
+        f_train_name = f_train_file + str(robot_n) + "_goal_3rb_" + dtstr + "_train.xlsx"
+        # ディレクトリがない場合、作成する
+        if not os.path.exists(f_train_file):
+            os.makedirs(f_train_file)
+        columns = ['trials', 'episodes', 'step', 'reward_sum', 'collisions', 'goal', 'time']
+        df = pd.DataFrame(columns=columns)
+        df.to_excel(f_train_name, index=False)
+    if evaluation:
+        # テストファイル
+        f_test_file =  os.path.dirname(os.path.realpath(__file__)) + '/score/'
+        f_test_name = f_test_file + str(robot_n) + "_goal_3rb_" + dtstr + "_test.xlsx"
+        # ディレクトリがない場合、作成する
+        if not os.path.exists(f_test_file):
+            os.makedirs(f_test_file)
+        columns = ['trials', 'episodes', 'step', 'reward_sum', 'collisions', 'goal', 'time']
+        df = pd.DataFrame(columns=columns)
+        df.to_excel(f_test_name, index=False)
+
+        # 評価ファイル
+        f_evaluate_file =  os.path.dirname(os.path.realpath(__file__)) + '/score/'
+        f_evaluate_name = f_evaluate_file + str(robot_n) + "_goal_3rb_" + dtstr + "_evaluate.xlsx"
+        # ディレクトリがない場合、作成する
+        if not os.path.exists(f_evaluate_file):
+            os.makedirs(f_evaluate_file)
+        columns = ['trials', 'episodes', 'step_ave', 'collisions_ave', 'goal_ave', 'evaluation']
+        df = pd.DataFrame(columns=columns)
+        df.to_excel(f_evaluate_name, index=False)
+
+    # パラメータを受け取るデータベース名
     to_main_db_name = os.path.dirname(os.path.realpath(__file__)) + "/score/to_main.db"
 
     while True: # 全トライアルの処理が終わるまでループ
@@ -661,53 +695,14 @@ if __name__ == '__main__':
                   r_passive, Target, trials, agent.mask_switch, agent.display_image_normal, 
                   agent.display_image_mask, agent.display_rb)
 
-        #########記録ファイル作成########################################################
+        # トライアル数の記録
+        data = [[''], [str(trials)]]
+        columns = ['trials']
         if training:
-            # 学習ファイル
-            f_train_file = os.path.dirname(os.path.realpath(__file__)) + '/score/'
-            f_train_name = f_train_file + str(agent.robot_n) + "_goal_3rb_" + str(Target) + "_" + dtstr + "_train.xlsx"
-            # ディレクトリがない場合、作成する
-            if not os.path.exists(f_train_file):
-                os.makedirs(f_train_file)
-            if trials == 0 or trials == agent.trial_restart:
-                columns = ['trials', 'episodes', 'step', 'reward_sum', 'collisions', 'goal', 'time']
-                df = pd.DataFrame(columns=columns)
-                df.to_excel(f_train_name, index=False)
-            # トライアル数を書き込む
-            data = [[''], [str(trials)]]
-            columns = ['trials']
             agent.excel(data, columns, f_train_name)
         if evaluation:
-            # テストファイル
-            f_test_file =  os.path.dirname(os.path.realpath(__file__)) + '/score/'
-            f_test_name = f_test_file + str(agent.robot_n) + "_goal_3rb_" + str(Target) + "_" + dtstr + "_test.xlsx"
-            # ディレクトリがない場合、作成する
-            if not os.path.exists(f_test_file):
-                os.makedirs(f_test_file)
-            if trials == 0 or trials == agent.trial_restart:
-                columns = ['trials', 'episodes', 'step', 'reward_sum', 'collisions', 'goal', 'time']
-                df = pd.DataFrame(columns=columns)
-                df.to_excel(f_test_name, index=False)
-            # トライアル数を書き込む
-            data = [[''], [str(trials)]]
-            columns = ['trials']
             agent.excel(data, columns, f_test_name)
-
-            # 評価ファイル
-            f_evaluate_file =  os.path.dirname(os.path.realpath(__file__)) + '/score/'
-            f_evaluate_name = f_evaluate_file + str(agent.robot_n) + "_goal_3rb_" + str(Target) + "_" + dtstr + "_evaluate.xlsx"
-            # ディレクトリがない場合、作成する
-            if not os.path.exists(f_evaluate_file):
-                os.makedirs(f_evaluate_file)
-            if trials == 0 or trials == agent.trial_restart:
-                columns = ['trials', 'episodes', 'step_ave', 'collisions_ave', 'goal_ave', 'evaluation']
-                df = pd.DataFrame(columns=columns)
-                df.to_excel(f_evaluate_name, index=False)
-            # トライアル数を書き込む
-            data = [[''], [str(trials)]]
-            columns = ['trials']
             agent.excel(data, columns, f_evaluate_name)
-        ################################################################################
         
         #########ロボットの学習・テスト・デモ#################
         if training:
