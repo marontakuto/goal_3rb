@@ -252,78 +252,62 @@ class DynamicGammaTPE(TPESampler): # 上位群の割合を変動させるTPE
         return ret
 
 
-class Visual: # Optunaの可視化
+class VisualOptuna: # Optunaの可視化
     def __init__(self):
         self.to_trial = 10 # 何トライアルごとにグラフを作成するか
         self.initial_trial = 50 # 何トライアル目からグラフを作成するか
         self.png = True # 画像として保存するか
         self.html = False # HTMLとして保存するか
+
+        # 単一目的(種類: 'history', 'slice', 'importances', 'coordinate', 'contour')
+        self.graph_type_single = ['history', 'slice', 'importances'] # 作成するグラフの種類
+
+        # 多目的(種類: 'pareto', 'slice1', 'slice2')
+        self.graph_type_multi = ['pareto', 'slice1', 'slice2'] # 作成するグラフの種類
+
+        self.dir_path = os.path.dirname(os.path.realpath(__file__))
     
-    def v1(self, trials): # 単一目的
-        if trials + 1 % self.to_trial == 0 and trials + 1 >= self.initial_trial:
-            print ('save graph')
+    def create_graph_single(self, trials): # 単一目的
+        if (trials + 1) % self.to_trial == 0 and (trials + 1) >= self.initial_trial:
+            print ('Start creating graph')
 
             dt = datetime.now()
-            f_score_file =  os.path.dirname(os.path.realpath(__file__)) + '/score/'
-            dtstr = dt.strftime('%d_%H:%M')
+            dtstr = dt.strftime('%m-%d_%H[h]%M[m]%S[s]')
+            f_score_file = self.dir_path + '/score/' + str(trials) + 'trial_' + dtstr
 
-            # グラフの作成
-            fig = optuna.visualization.plot_optimization_history(study) # 全トライアルのスコアとベストスコア
-            if self.png:
-                fig.write_image(f_score_file + dtstr + '_' + str(trials) + 'trial_history.png')
-            if self.html:
-                fig.write_html(f_score_file + dtstr + '_' + str(trials) + 'trial_history.html')
-
-            fig = optuna.visualization.plot_slice(study) # パラメータのどの値を重点的に探索しているか
-            if self.png:
-                fig.write_image(f_score_file + dtstr + '_' + str(trials) + 'trial_slice.png')
-            if self.html:
-                fig.write_html(f_score_file + dtstr + '_' + str(trials) + 'trial_slice.html')
-
-            fig = optuna.visualization.plot_param_importances(study) # 各パラメータがscore向上にどれだけ効いたか
-            if self.png:
-                fig.write_image(f_score_file + dtstr + '_' + str(trials) + 'trial_importances.png')
-            if self.html:
-                fig.write_html(f_score_file + dtstr + '_' + str(trials) + 'trial_importances.html')
-
-            # fig = optuna.visualization.plot_parallel_coordinate(study) # scoreが高いパラメータの組み合わせ
-            # if self.png:
-            #     fig.write_image(f_score_file + dtstr + '_' + str(trials) + 'trial_coordinate.png')
-            # if self.html:
-            #     fig.write_html(f_score_file + dtstr + '_' + str(trials) + 'trial_coordinate.html')
-
-            # fig = optuna.visualization.plot_contour(study) # 各2変数の組み合わせでそれぞれの値がどれだけ効くか
-            # if self.png:
-            #     fig.write_image(f_score_file + dtstr + '_' + str(trials) + 'trial_contour.png')
-            # if self.html:
-            #     fig.write_html(f_score_file + dtstr + '_' + str(trials) + 'trial_contour.html')
+            # グラフの作成と保存
+            history = optuna.visualization.plot_optimization_history(study) # 全トライアルのスコアとベストスコア
+            slice = optuna.visualization.plot_slice(study) # パラメータのどの値を重点的に探索しているか
+            importances = optuna.visualization.plot_param_importances(study) # 各パラメータがscore向上にどれだけ効いたか
+            coordinate = optuna.visualization.plot_parallel_coordinate(study) # scoreが高いパラメータの組み合わせ
+            contour = optuna.visualization.plot_contour(study) # 各2変数の組み合わせでそれぞれの値がどれだけ効くか
+            for graph_type in self.graph_type_single:
+                if self.png:
+                    locals()[graph_type].write_image(f_score_file + '_' + str(graph_type) + '.png')
+                if self.html:
+                    locals()[graph_type].write_html(f_score_file + '_' + str(graph_type) + '.html')
+            
+            print ('Finish creating graph')
     
-    def v2(self, trials): # 2目的
-        if trials + 1 % self.to_trial == 0 and trials + 1 >= self.initial_trial:
-            print ('save graph')
+    def create_graph_multi(self, trials): # 多目的
+        if (trials + 1) % self.to_trial == 0 and (trials + 1) >= self.initial_trial:
+            print ('Start creating graph')
 
             dt = datetime.now()
-            f_score_file =  os.path.dirname(os.path.realpath(__file__)) + '/score/'
-            dtstr = dt.strftime('%d_%H:%M')
+            dtstr = dt.strftime('%m-%d_%H[h]%M[m]%S[s]')
+            f_score_file =  os.path.dirname(os.path.realpath(__file__)) + '/score/' + str(trials) + 'trial_' + dtstr
 
-            # グラフの作成
-            fig = optuna.visualization.plot_pareto_front(study,include_dominated_trials=True)
-            if self.png:
-                fig.write_image(f_score_file + dtstr+'_'+str(trials)+'trial_pareto_front.png')
-            if self.html:
-                fig.write_html(f_score_file + dtstr + '_' + str(trials) + 'trial_pareto_front.html')
-
-            fig = optuna.visualization.plot_slice(study,target=lambda t: t.values[0])
-            if self.png:
-                fig.write_image(f_score_file + dtstr+'_'+str(trials)+'trial_plot_slice1.png')
-            if self.html:
-                fig.write_html(f_score_file + dtstr + '_' + str(trials) + 'trial_plot_slice1.html')
-
-            fig = optuna.visualization.plot_slice(study,target=lambda t: t.values[1])
-            if self.png:
-                fig.write_image(f_score_file + dtstr+'_'+str(trials)+'trial_plot_slice2.png')
-            if self.html:
-                fig.write_html(f_score_file + dtstr + '_' + str(trials) + 'trial_plot_slice2.html')
+            # グラフの作成と保存
+            pareto = optuna.visualization.plot_pareto_front(study,include_dominated_trials=True)
+            slice1 = optuna.visualization.plot_slice(study,target=lambda t: t.values[0])
+            slice2 = optuna.visualization.plot_slice(study,target=lambda t: t.values[1])
+            for graph_type in self.graph_type_multi:
+                if self.png:
+                    locals()[graph_type].write_image(f_score_file + '_' + str(graph_type) + '.png')
+                if self.html:
+                    locals()[graph_type].write_html(f_score_file + '_' + str(graph_type) + '.html')
+            
+            print ('Finish creating graph')
 
 
 class SQL: # 各ノードでのパラメータの評価を参照するためのデータベースを操作
@@ -452,8 +436,7 @@ def main(trial):
         f.writelines(text)
 
     # グラフの作成
-    visual = Visual()
-    visual.v1(trials)
+    visual.create_graph_single(trials)
     
     # パラメータファイルの削除(トライアル数が多い場合は必須)
     try:
@@ -471,6 +454,7 @@ if __name__ == '__main__':
     rospy.init_node('optuna_goal_3rb')
 
     sql = SQL()
+    visual = VisualOptuna()
 
     optuna_db_name = 'optuna' # データベースの名前
     optuna_db_path = 'sqlite:///' + os.path.dirname(os.path.realpath(__file__)) + '/score/optuna.db' # データベースの保存場所
@@ -497,7 +481,7 @@ if __name__ == '__main__':
     
     #########記録ファイル作成########################################################
     dt = datetime.now() # 現在時刻の取得
-    dtstr = dt.strftime('%m_%d_%H:%M:%S') # y(year), m(month), d(day), H(hour), M(minute), S(second)
+    dtstr = dt.strftime('%m-%d_%H[h]%M[m]%S[s]') # y(year), m(month), d(day), H(hour), M(minute), S(second)
     f_learning_file =  os.path.dirname(os.path.realpath(__file__)) + '/score/' # os.path.dirname(os.path.realpath(__file__)) ← カレントディレクトリのパス
     f_learning_name = f_learning_file + 'optuna_' + dtstr + '.txt'
     if not os.path.exists(f_learning_file):
