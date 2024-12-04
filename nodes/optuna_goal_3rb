@@ -21,6 +21,15 @@ import sqlite3
 
 class Select: # Optunaのパラメータを管理するデータベースを操作
     def __init__(self):
+        # データベースで扱う変数名
+        self.parameters = [
+            'network', 'conv_num', 'mid_layer_num', 'mid_units1', 'mid_units2', 
+            'mid_units3', 'cnv_act', 'ful_act', 'optimizer', 'batch_size', 
+            'r_collision', 'r_just', 'r_near', 'r_goal', 'r_cost', 'r_passive', 
+            'Target', 'trials', 'trial_size'
+            ]
+
+        # データベース名の定義
         self.db_path = os.path.dirname(os.path.realpath(__file__)) + "/score/to_main.db"
         directory = os.path.dirname(self.db_path)
         if not os.path.exists(directory): # ディレクトリが存在しない場合は作成
@@ -39,10 +48,19 @@ class Select: # Optunaのパラメータを管理するデータベースを操�
         ''')
         self.conn.commit()
 
-        if os.path.exists(self.db_path): # 既存の値をクリア
+        # データベースファイルが存在していれば既存の値をクリア
+        if os.path.exists(self.db_path):
             self.clear_all_values()
+        
+        # パラメータの初期化関数
+        for param_name in self.parameters:
+            self.cursor.execute('''
+            INSERT OR IGNORE INTO to_main (name)
+            VALUES (?)
+            ''', (param_name,))
+        self.conn.commit()
 
-    def choice_param(self, trial, trials, parameters, Target, trial_size): # Optunaのパラメータ選択
+    def choice_param(self, trial, trials, Target, trial_size): # Optunaのパラメータ選択
 
         network='DCNN' # CNN or DCNN or MLP
 
@@ -164,17 +182,8 @@ class Select: # Optunaのパラメータを管理するデータベースを操�
             r_cost = None
             r_passive = None
         
-        for name in parameters:
+        for name in self.parameters:
             self.set_parameter_value(name, locals()[name])
-    
-    # パラメータの初期化関数
-    def initialize_parameters(self, param_names):
-        for param_name in param_names:
-            self.cursor.execute('''
-            INSERT OR IGNORE INTO to_main (name)
-            VALUES (?)
-            ''', (param_name,))
-        self.conn.commit()
 
     # 値の設定
     def set_parameter_value(self, name, value):
@@ -310,8 +319,12 @@ class VisualOptuna: # Optunaの可視化
             print ('Finish creating graph')
 
 
-class SQL: # 各ノードでのパラメータの評価を参照するためのデータベースを操作
+class Result: # 各ノードでのパラメータの評価を参照するためのデータベースを操作
     def __init__(self):
+        # 変数定義
+        self.robot_num = 3 # ロボットの数
+        self.result_num = 3 # 扱う施行結果の回数
+
         # データベースとテーブルを準備
         self.db_path = os.path.dirname(os.path.realpath(__file__)) + "/score/to_optuna.db"
         directory = os.path.dirname(self.db_path)
@@ -330,14 +343,14 @@ class SQL: # 各ノードでのパラメータの評価を参照するための�
         conn.commit()
         conn.close()
 
-    # 3つノードから3つのデータが揃っているか確認
+    # 各ノードから各データが揃っているか確認
     def check_data_ready(self):
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         cursor.execute("SELECT process_id, COUNT(*) as count FROM to_optuna GROUP BY process_id")
         results = cursor.fetchall()
         conn.close()
-        if len(results) == 3 and all(count == 3 for _, count in results):
+        if len(results) == self.robot_num and all(count == self.result_num for _, count in results):
             return True
         return False
 
@@ -361,31 +374,24 @@ class SQL: # 各ノードでのパラメータの評価を参照するための�
 
 def main(trial):
 
-    trials = len(study.trials) - 1
+    trials = len(study.trials) - 1 # トライアル数(0から始まる)
     print('\ntrial ' + str(trials) + ' start')
 
-    select = Select()
-    parameters = ['network', 'conv_num', 'mid_layer_num', 'mid_units1', 'mid_units2', 
-                  'mid_units3', 'cnv_act', 'ful_act', 'optimizer', 'batch_size', 
-                  'r_collision', 'r_just', 'r_near', 'r_goal', 'r_cost', 'r_passive', 
-                  'Target', 'trials', 'trial_size']
-    select.initialize_parameters(parameters)
-    select.choice_param(trial, trials, parameters, Target, trial_size)
+    select.choice_param(trial, trials, Target, trial_size) # Optunaによるパラメータの選択
 
-    print('params = ' + str(study.trials[-1].params))
+    print('params = ' + str(study.trials[-1].params)) # Optunaが選択したパラメータの出力
 
-    while True: # 結果が格納されるまで待機
+    while True: # すべての結果が格納されるまで待機
         if sql.check_data_ready:
             break
         time.sleep(1)
     
-    while True: # 結果が反映されるまで待機
-        if len(sql.pick_data()) == 9: # len(sql.pick_data()) == ロボットの台数 * 3
+    while True: # すべての結果が反映されるまでデータを参照
+        data = sql.pick_data() # データの参照
+        if len(sql.pick_data()) == sql.robot_num * sql.result_num:
+            sql.clear_data() # データベースの初期化
             break
         time.sleep(1)
-    
-    data = sql.pick_data() # データの参照
-    sql.clear_data() # データベースの初期化
 
     score_rb0_list = []
     score_rb1_list = []
@@ -394,6 +400,7 @@ def main(trial):
     for row in data:
         locals()[f"score_rb{row[0]}_list"].append(float(row[1])) # 各ロボットのscoreリストに結果を格納
 
+    # 評価値の算出
     score_1st_last_list = [score_rb0_list[0], score_rb1_list[0], score_rb2_list[0]]
     score_2nd_last_list = [score_rb0_list[1], score_rb1_list[1], score_rb2_list[1]]
     score_3rd_last_list = [score_rb0_list[2], score_rb1_list[2], score_rb2_list[2]]
@@ -453,19 +460,20 @@ if __name__ == '__main__':
     
     rospy.init_node('optuna_goal_3rb')
 
-    sql = SQL()
+    sql = Result()
     visual = VisualOptuna()
+    select = Select()
 
     optuna_db_name = 'optuna' # データベースの名前
     optuna_db_path = 'sqlite:///' + os.path.dirname(os.path.realpath(__file__)) + '/score/optuna.db' # データベースの保存場所
 
     ### Optunaの設定 ###########
-    trial_size = 30 # 実行するトライアル数
+    trial_size = 20 # 実行するトライアル数
     Target = 'both' # 'both' or 'network' or 'reward'
     save_study = False # Optunaの内容をデータベースに保存
     load_study = True # 前回のOptunaの内容を引き継ぐ
     shutdown = True # プログラム終了時にPCの電源を落とすか否か
-    fix = False # 初期トライアルのパラメータ値の固定(study.optimizeの直前でstudy.enqueue_trialを用いて追加してください)
+    fix = True # 初期トライアルのパラメータ値の固定(study.optimizeの直前でstudy.enqueue_trialを用いて追加してください)
     choice_param_only = False # 指定したパラメータのみを用いる
     ############################
     
@@ -502,7 +510,7 @@ if __name__ == '__main__':
         for i in range(trial_size):
             study.enqueue_trial({'conv_num': 2, 'mid_layer_num': 2, 'mid_units1': 512, 'mid_units2': 512, 'r_collision': 1000, 'r_just': 0.4, 'r_near': 5, 'r_goal': 2000, 'r_cost': 10, 'r_passive': 50})
             study.optimize(main, n_trials=1)
-    elif fix: # 初期値の固定
+    elif fix and len(study.trials) == 0: # 初期値の固定
         study.enqueue_trial({'conv_num': 2, 'mid_layer_num': 2, 'mid_units1': 512, 'mid_units2': 512, 'r_collision': 1000, 'r_just': 0.4, 'r_near': 5, 'r_goal': 2000, 'r_cost': 10, 'r_passive': 50})
         study.optimize(main, n_trials=trial_size)
     else: # スタンダード
