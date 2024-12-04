@@ -30,7 +30,7 @@ class Select: # Optunaのパラメータを管理するデータベースを操�
             ]
 
         # データベース名の定義
-        self.db_path = os.path.dirname(os.path.realpath(__file__)) + "/score/to_main.db"
+        self.db_path = os.path.dirname(os.path.realpath(__file__)) + "/result/to_main.db"
         directory = os.path.dirname(self.db_path)
         if not os.path.exists(directory): # ディレクトリが存在しない場合は作成
             os.makedirs(directory)
@@ -282,7 +282,7 @@ class VisualOptuna: # Optunaの可視化
 
             dt = datetime.now()
             dtstr = dt.strftime('%m-%d_%H[h]%M[m]%S[s]')
-            f_score_file = self.dir_path + '/score/' + str(trials) + 'trial_' + dtstr
+            f_score_file = self.dir_path + '/result/' + str(trials) + 'trial_' + dtstr
 
             # グラフの作成と保存
             history = optuna.visualization.plot_optimization_history(study) # 全トライアルのスコアとベストスコア
@@ -304,7 +304,7 @@ class VisualOptuna: # Optunaの可視化
 
             dt = datetime.now()
             dtstr = dt.strftime('%m-%d_%H[h]%M[m]%S[s]')
-            f_score_file =  os.path.dirname(os.path.realpath(__file__)) + '/score/' + str(trials) + 'trial_' + dtstr
+            f_score_file =  os.path.dirname(os.path.realpath(__file__)) + '/result/' + str(trials) + 'trial_' + dtstr
 
             # グラフの作成と保存
             pareto = optuna.visualization.plot_pareto_front(study,include_dominated_trials=True)
@@ -326,7 +326,7 @@ class Result: # 各ノードでのパラメータの評価を参照するため�
         self.result_num = 3 # 扱う施行結果の回数
 
         # データベースとテーブルを準備
-        self.db_path = os.path.dirname(os.path.realpath(__file__)) + "/score/to_optuna.db"
+        self.db_path = os.path.dirname(os.path.realpath(__file__)) + "/result/to_optuna.db"
         directory = os.path.dirname(self.db_path)
         if os.path.exists(self.db_path):
             self.clear_data()
@@ -465,7 +465,7 @@ if __name__ == '__main__':
     select = Select()
 
     optuna_db_name = 'optuna' # データベースの名前
-    optuna_db_path = 'sqlite:///' + os.path.dirname(os.path.realpath(__file__)) + '/score/optuna.db' # データベースの保存場所
+    optuna_db_path = 'sqlite:///' + os.path.dirname(os.path.realpath(__file__)) + '/result/optuna.db' # データベースの保存場所
 
     ### Optunaの設定 ###########
     trial_size = 20 # 実行するトライアル数
@@ -490,7 +490,7 @@ if __name__ == '__main__':
     #########記録ファイル作成########################################################
     dt = datetime.now() # 現在時刻の取得
     dtstr = dt.strftime('%m-%d_%H[h]%M[m]%S[s]') # y(year), m(month), d(day), H(hour), M(minute), S(second)
-    f_learning_file =  os.path.dirname(os.path.realpath(__file__)) + '/score/' # os.path.dirname(os.path.realpath(__file__)) ← カレントディレクトリのパス
+    f_learning_file =  os.path.dirname(os.path.realpath(__file__)) + '/result/' # os.path.dirname(os.path.realpath(__file__)) ← カレントディレクトリのパス
     f_learning_name = f_learning_file + 'optuna_' + dtstr + '.txt'
     if not os.path.exists(f_learning_file):
         os.makedirs(f_learning_file)

@@ -617,7 +617,7 @@ if __name__ == '__main__':
     # 記録ファイル作成
     if training:
         # 学習ファイル
-        f_train_file = os.path.dirname(os.path.realpath(__file__)) + '/score/'
+        f_train_file = os.path.dirname(os.path.realpath(__file__)) + '/result/'
         f_train_name = f_train_file + str(robot_n) + "_goal_3rb_" + dtstr + "_train.xlsx"
         # ディレクトリがない場合、作成する
         if not os.path.exists(f_train_file):
@@ -627,7 +627,7 @@ if __name__ == '__main__':
         df.to_excel(f_train_name, index=False)
     if evaluation:
         # テストファイル
-        f_test_file =  os.path.dirname(os.path.realpath(__file__)) + '/score/'
+        f_test_file =  os.path.dirname(os.path.realpath(__file__)) + '/result/'
         f_test_name = f_test_file + str(robot_n) + "_goal_3rb_" + dtstr + "_test.xlsx"
         # ディレクトリがない場合、作成する
         if not os.path.exists(f_test_file):
@@ -637,7 +637,7 @@ if __name__ == '__main__':
         df.to_excel(f_test_name, index=False)
 
         # 評価ファイル
-        f_evaluate_file =  os.path.dirname(os.path.realpath(__file__)) + '/score/'
+        f_evaluate_file =  os.path.dirname(os.path.realpath(__file__)) + '/result/'
         f_evaluate_name = f_evaluate_file + str(robot_n) + "_goal_3rb_" + dtstr + "_evaluate.xlsx"
         # ディレクトリがない場合、作成する
         if not os.path.exists(f_evaluate_file):
@@ -647,7 +647,7 @@ if __name__ == '__main__':
         df.to_excel(f_evaluate_name, index=False)
 
     # パラメータを受け取るデータベース名
-    to_main_db_name = os.path.dirname(os.path.realpath(__file__)) + "/score/to_main.db"
+    to_main_db_name = os.path.dirname(os.path.realpath(__file__)) + "/result/to_main.db"
 
     while True: # 全トライアルの処理が終わるまでループ
 
@@ -735,7 +735,7 @@ if __name__ == '__main__':
 
         # 結果格納用データベースに結果を格納
         for data in score_list:
-            to_optuna = sqlite3.connect(os.path.dirname(os.path.realpath(__file__)) + "/score/to_optuna.db")
+            to_optuna = sqlite3.connect(os.path.dirname(os.path.realpath(__file__)) + "/result/to_optuna.db")
             cursor_to_optuna = to_optuna.cursor()
             cursor_to_optuna.execute("INSERT INTO to_optuna (process_id, data) VALUES (?, ?)", (agent.robot_n, data))
             to_optuna.commit()
