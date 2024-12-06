@@ -643,14 +643,16 @@ class Env():
         ############################
 
         ### 設定変更の実験 ###
-        if self.trials >= 9:
-            threshold = 0.3
+        if self.trials >= 12:
+            threshold = 0.45
+        elif self.trials >= 9:
+            threshold = 0.4
         elif self.trials >= 6:
-            threshold = 0.3
+            threshold = 0.35
         elif self.trials >= 3:
             threshold = 0.3
         else:
-            threshold = 0.3
+            threshold = 0.25
         #######################
 
         # リカバリー方策の利用判定

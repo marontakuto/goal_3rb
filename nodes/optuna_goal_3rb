@@ -468,7 +468,7 @@ if __name__ == '__main__':
     optuna_db_path = 'sqlite:///' + os.path.dirname(os.path.realpath(__file__)) + '/result/optuna.db' # データベースの保存場所
 
     ### Optunaの設定 ###########
-    trial_size = 12 # 実行するトライアル数
+    trial_size = 15 # 実行するトライアル数
     Target = 'both' # 'both' or 'network' or 'reward'
     save_study = False # Optunaの内容をデータベースに保存
     load_study = False# 前回のOptunaの内容を引き継ぐ
