@@ -474,7 +474,7 @@ if __name__ == '__main__':
     load_study = False# 前回のOptunaの内容を引き継ぐ
     shutdown = True # プログラム終了時にPCの電源を落とすか否か
     fix = True # 初期トライアルのパラメータ値の固定(study.optimizeの直前でstudy.enqueue_trialを用いて追加してください)
-    choice_param_only = False # 指定したパラメータのみを用いる
+    choice_param_only = True # 指定したパラメータのみを用いる
     ############################
     
     """ 上位群の割合を減少させるTPE(initial_gamma: 最初の上位群の割合, final_gamma: 減少後の上位群の割合, stop_trial: 割合減少を止めるトライアル, random_trials: ランダムサーチのトライアル数) """
