@@ -59,12 +59,8 @@ class ReinforceAgent():
         self.display_rb = [2] # カメラ画像を出力するロボットの識別番号
         self.screen_list = [2] # 学習経過を出力するロボットの識別番号
         self.recovery = True # リカバリー方策を適用するか否か
-        self.teleport = True # 衝突時は空いたスペースに再配置する
-        self.termination_e = 999 # ロボットがフィールド外の左側に存在したら強制終了を始めるエピソード(最初のエピソードから行っていると無駄な計算量が出る)
-        self.all_episode_test = False # すべてのエピソードをテスト
-        self.synchro = True # エピソードごとの同期の有無
-        if self.all_episode_test: # すべてのエピソードをテストする場合は必ず同期する
-            self.synchro = True
+        self.teleport = True # 衝突時は空いたスペースに再配置するか否か
+        self.all_episode_test = True # すべてのエピソードをテスト
         ########################
 
         # ### オプション有無の実験 ###
@@ -243,7 +239,6 @@ class ReinforceAgent():
         color_list = []
 
         collision = False
-        termination = False
 
         for e in range(1, self.episode + 1):
 
@@ -310,12 +305,6 @@ class ReinforceAgent():
                     color_list.append(color_count)
 
                     break
-                
-                # 他のロボットがフィールド外に下側に存在する場合強制終了
-                if e >= self.termination_e and self.mode == 'sim':
-                    termination = env.area_judge(terms='soft', area='left')
-                    if termination:
-                        break
             
             # モデルの保存
             if self.save_rbuf:
@@ -323,17 +312,13 @@ class ReinforceAgent():
             self.model.save(self.dirPath + '/TRIAL' + str(trials) + '/episode' + str(e) + '/robot_' + str(self.robot_n)) # モデルの保存
             
             # エピソードごとの同期(他ロボットが右のエリアにいることを確認することで同期を取る)
-            if self.synchro and e != self.episode:
+            if e != self.episode:
                 env.set_robot(102) # フィールド外の右側に配置
                 sync = False
                 while sync == False:
                     sync = env.area_judge(terms='hard', area='right')
                 time.sleep(0.5)
                 env.set_robot(0) # 初期位置に配置
-
-            # 学習中に強制終了の処置がされた場合
-            if termination:
-                break
 
         # 最高点の時の情報を取得
         best_episode = old_score.index(max(old_score)) + 1 # scoreが最大のエピソード
@@ -353,12 +338,10 @@ class ReinforceAgent():
             time.sleep(0.5)
         
         # テストに用いるエピソードモデルの選択
-        if e <= 2:
-            test_episodes = [e, e, e] # 学習を3回以上行っていない場合は最後のエピソードを3回テスト
-        elif self.all_episode_test:
+        if self.all_episode_test:
             test_episodes = list(range(1, self.episode + 1)) # すべてのエピソードをテスト
         else:
-            test_episodes = [e, e - 1, e - 2] # 最後のエピソードから1, 2, 3番目をテスト
+            test_episodes = list(range(self.episode - test_num + 1, self.episode + 1)) # 最後のtest_num個のエピソードをテスト
 
         return test_episodes
 
@@ -376,7 +359,7 @@ class ReinforceAgent():
 
         start_time = time.time()
 
-        if test_e == 999: # 指定されたモデルのロード
+        if test_e >= 1000: # 指定されたモデルのロード
             self.model.load(self.dirPath + '/load_model/robot_' + str(self.robot_n))
         else: # 学習の内指定されたエピソードのロード
             self.model.load(self.dirPath + '/TRIAL' + str(trials) + '/episode' + str(test_e) + '/robot_' + str(self.robot_n))
@@ -604,9 +587,9 @@ if __name__ == '__main__':
     rospy.init_node('main_goal_3rb')
 
     training = True # 学習の有無
-    evaluation = True # テストの有無
+    evaluation = True # テストの有無(ここだけTrueにしたら自動的にロードしたモデルでテストになります)
     demonstration = False # デモンストレーションの有無
-    load_test_num = 3 # ロードしたモデルでテストする回数(training = False, evaluation = True の場合) ※3以上必須
+    test_num = 3 # テストする回数(training, evaluation, agent.all_episode_test が True の場合は agent.episode が定義されます)
 
     # 実験開始時間の取得
     dt = datetime.now() # 現在時刻の取得
@@ -694,6 +677,15 @@ if __name__ == '__main__':
                   agent.teleport, r_collision, r_just, r_near, r_goal, r_cost, 
                   r_passive, Target, trials, agent.mask_switch, agent.display_image_normal, 
                   agent.display_image_mask, agent.display_rb)
+        
+        # テストを行う回数を記録
+        if training and evaluation and agent.all_episode_test:
+            test_num = agent.episode
+        to_optuna = sqlite3.connect(os.path.dirname(os.path.realpath(__file__)) + "/result/to_optuna.db")
+        cursor_to_optuna = to_optuna.cursor()
+        cursor_to_optuna.execute("INSERT INTO to_optuna (process_id, data) VALUES (?, ?)", (999, test_num))
+        to_optuna.commit()
+        to_optuna.close()
 
         # トライアル数の記録
         data = [[''], [str(trials)]]
@@ -707,26 +699,24 @@ if __name__ == '__main__':
         #########ロボットの学習・テスト・デモ#################
         if training:
             test_episodes = agent.train() # 学習の実行
-            score_list = [0, 0, 0]
         if evaluation:
             score_list = []
             if 'test_episodes' not in locals():
-                test_episodes = [999 for _ in range(load_test_num)]
+                test_episodes = list(1000, 1000 + test_num)
             for test_e in test_episodes:
                 score = agent.evaluate(test_e)  # テストの実行
-                score_list.append(score)
+                score_list.append([score, test_e])
         if demonstration:
             agent.demo() # デモンストレーションの実行
-            score_list = [0, 0, 0]
-        if not training and not evaluation and not demonstration:
-            score_list = [100, 100, 100]
-            print('training/evaluation/demonstration のどれかをTrueにしてください!')
+        if not training and not evaluation and not demonstration and (agent.robot_n in agent.screen_list):
+            print('training, evaluation, demonstration のどれかをTrueにしてください!')
             time.sleep(3)
         #######################################################
-        
-        score_list = score_list[-3:] # 評価リストの後方3つを採用する
 
-        # データベースにあるパラメータ値の削除とsetフラグの解除
+        if 'score_list' not in locals():
+            score_list = list([i, i] for i in range(agent.episode - test_num + 1, agent.episode + 1))
+
+        # データベースにあるOptunaパラメータ値の削除とsetフラグの解除
         cursor_to_main.execute('''
         UPDATE to_main
         SET value = NULL, is_set = 0
@@ -737,7 +727,7 @@ if __name__ == '__main__':
         for data in score_list:
             to_optuna = sqlite3.connect(os.path.dirname(os.path.realpath(__file__)) + "/result/to_optuna.db")
             cursor_to_optuna = to_optuna.cursor()
-            cursor_to_optuna.execute("INSERT INTO to_optuna (process_id, data) VALUES (?, ?)", (agent.robot_n, data))
+            cursor_to_optuna.execute("INSERT INTO to_optuna (process_id, data, episode) VALUES (?, ?, ?)", (agent.robot_n, data[0], data[1]))
             to_optuna.commit()
             to_optuna.close()
         

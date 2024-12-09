@@ -17,6 +17,7 @@ from optuna.samplers import TPESampler
 from optuna.trial import TrialState
 
 import sqlite3
+import pandas as pd
 
 
 class Select: # Optunaのパラメータを管理するデータベースを操作
@@ -323,7 +324,6 @@ class Result: # 各ノードでのパラメータの評価を参照するため�
     def __init__(self):
         # 変数定義
         self.robot_num = 3 # ロボットの数
-        self.result_num = 3 # 扱う施行結果の回数
 
         # データベースとテーブルを準備
         self.db_path = os.path.dirname(os.path.realpath(__file__)) + "/result/to_optuna.db"
@@ -337,20 +337,23 @@ class Result: # 各ノードでのパラメータの評価を参照するため�
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS to_optuna (
                 process_id INTEGER,
-                data TEXT
+                data INTEGER,
+                episode INTEGER
             )
         """)
         conn.commit()
         conn.close()
-
-    # 各ノードから各データが揃っているか確認
-    def check_data_ready(self):
+    
+    # 各ノードからいくつのデータを扱うか確認
+    def check_data_num(self):
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
-        cursor.execute("SELECT process_id, COUNT(*) as count FROM to_optuna GROUP BY process_id")
+        cursor.execute("SELECT data FROM to_optuna WHERE process_id = ?", (999,))
         results = cursor.fetchall()
         conn.close()
-        if len(results) == self.robot_num and all(count == self.result_num for _, count in results):
+        if len(results) == self.robot_num:
+            self.result_num = results[0][0]
+            self.clear_data()
             return True
         return False
 
@@ -361,15 +364,40 @@ class Result: # 各ノードでのパラメータの評価を参照するため�
         cursor.execute("DELETE FROM to_optuna")
         conn.commit()
         conn.close()
-
+    
     # データの参照
-    def pick_data(self):
+    def pick_data(self, column='*', robot='IS NOT NULL', episode='IS NOT NULL'):
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
-        cursor.execute("SELECT * FROM to_optuna")
+        query = (
+            f"SELECT {column} "
+            f"FROM to_optuna "
+            f"WHERE process_id {robot} "
+            f"AND episode {episode}"
+        )
+        cursor.execute(query)
         data = cursor.fetchall()
         conn.close()
         return data
+
+
+class Recode: # 記録ファイルの操作
+    def __init__(self):
+        dt = datetime.now() # 現在時刻の取得
+        dtstr = dt.strftime('%m_%d_%H:%M:%S')
+        file = os.path.dirname(os.path.realpath(__file__)) + '/result/' # os.path.dirname(os.path.realpath(__file__)) ← カレントディレクトリのパス
+        self.name = file + "goal_3rb_" + dtstr + "_optuna.xlsx"
+        if not os.path.exists(file):
+            os.makedirs(file)
+        columns = ['trials', 'episodes', 'robot0', 'robot1', 'robot2', 'average']
+        df = pd.DataFrame(columns=columns)
+        df.to_excel(self.name, index=False)
+    
+    def excel(self, data, columns): # Excelファイルへの追記
+        data = pd.DataFrame(data, columns=columns)
+        df = pd.read_excel(self.name)
+        df = pd.concat([df, data], ignore_index=True)
+        df.to_excel(self.name, index=False)
 
 
 def main(trial):
@@ -381,65 +409,52 @@ def main(trial):
 
     print('params = ' + str(study.trials[-1].params)) # Optunaが選択したパラメータの出力
 
-    while True: # すべての結果が格納されるまで待機
-        if sql.check_data_ready:
+    while True: # 扱う結果の数が格納されるまで待機
+        if sql.check_data_num():
             break
         time.sleep(1)
     
     while True: # すべての結果が反映されるまでデータを参照
-        data = sql.pick_data() # データの参照
         if len(sql.pick_data()) == sql.robot_num * sql.result_num:
-            sql.clear_data() # データベースの初期化
             break
         time.sleep(1)
 
-    score_rb0_list = []
-    score_rb1_list = []
-    score_rb2_list = []
+    # このトライアルのscoreを記録
+    data_ave_list = []
+    recode.excel([[''], [str(trials)]], ['trials'])
+    episode_size = sql.pick_data(column="MAX(episode)")[0][0]
+    for episode in range(episode_size - sql.result_num + 1, episode_size + 1):
+        data_0 = sql.pick_data(robot='=0', episode=f'={episode}')[0]
+        data_1 = sql.pick_data(robot='=1', episode=f'={episode}')[0]
+        data_2 = sql.pick_data(robot='=2', episode=f'={episode}')[0]
+        data_ave = round((data_0[1] + data_1[1] + data_2[1]) / 3, 2)
+        data_ave_list.append(data_ave)
+        if data_ave == max(data_ave_list):
+            max_episode = episode
+            score_max = data_ave
 
-    for row in data:
-        locals()[f"score_rb{row[0]}_list"].append(float(row[1])) # 各ロボットのscoreリストに結果を格納
-
-    # 評価値の算出
-    score_1st_last_list = [score_rb0_list[0], score_rb1_list[0], score_rb2_list[0]]
-    score_2nd_last_list = [score_rb0_list[1], score_rb1_list[1], score_rb2_list[1]]
-    score_3rd_last_list = [score_rb0_list[2], score_rb1_list[2], score_rb2_list[2]]
-    
-    score_1st_last_ave = round(sum(score_1st_last_list) / len(score_1st_last_list), 2)
-    score_2nd_last_ave = round(sum(score_2nd_last_list) / len(score_2nd_last_list), 2)
-    score_3rd_last_ave = round(sum(score_3rd_last_list) / len(score_3rd_last_list), 2)
-    score_ave_list = [score_1st_last_ave, score_2nd_last_ave, score_3rd_last_ave]
-
-    # Optuna評価値とするスコアを決定
-    max_index = score_ave_list.index(max(score_ave_list))
-    if max_index == 0:
-        optuna_select = "score_1st_last"
-    elif max_index == 1:
-        optuna_select = "score_2nd_last"
-    elif max_index == 2:
-        optuna_select = "score_3rd_last"
-    score_list_ave = score_ave_list[max_index]
-    
-    print('score_list = ' + str(score_list_ave) + ', select = ' + str(optuna_select))
+        data = [[str(episode), str(data_0[1]), str(data_1[1]), str(data_2[1]), str(data_ave)]]
+        columns = ['episodes', 'robot0', 'robot1', 'robot2', 'average']
+        data = pd.DataFrame(data, columns=columns)
+        recode.excel(data, columns)
+    sql.clear_data() # データベースの初期化
+    print('score_list = ' + str(score_max) + ', episode = ' + str(max_episode))
 
     # Optunaの記録
     if trials == 0:
-        o = 0
-    elif study.best_trial.value <= score_list_ave:
-        o = trials
+        best_trial_num = 0
+    elif study.best_trial.value < score_max:
+        best_trial_num = trials
     else:
-        o = study.best_trial.number
+        best_trial_num = study.best_trial.number
     text = [
         "TRIAL: " + str(trials) + "\n", 
         "parameter: " + str(study.trials[-1].params) + "\n", 
-        "robot_list: " + str([0, 1, 2]) + "\n", 
-        "score_1st_last: " + str([round(num, 2) for num in score_1st_last_list]) + " average: " + str(score_1st_last_ave) + "\n", 
-        "score_2nd_last: " + str([round(num, 2) for num in score_2nd_last_list]) + " average: " + str(score_2nd_last_ave) + "\n", 
-        "score_3rd_last: " + str([round(num, 2) for num in score_3rd_last_list]) + " average: " + str(score_3rd_last_ave) + "\n", 
-        "select: " + optuna_select + " score: " + str(score_list_ave) + "\n", 
-        "best_trial: " + str(o) + "\n\n"
+        "select episode: " + str(max_episode) + "\n", 
+        "score: " + str(score_max) + "\n", 
+        "best_trial: " + str(best_trial_num) + "\n\n"
     ]
-    with open(f_learning_name, 'a') as f: # ファイルにテキストを書き込む
+    with open(f_optuna_name, 'a') as f: # ファイルにテキストを書き込む
         f.writelines(text)
 
     # グラフの作成
@@ -453,7 +468,7 @@ def main(trial):
     except:
         pass
 
-    return round(score_list_ave, 2)
+    return score_max
 
 
 if __name__ == '__main__':
@@ -463,6 +478,7 @@ if __name__ == '__main__':
     sql = Result()
     visual = VisualOptuna()
     select = Select()
+    recode = Recode()
 
     optuna_db_name = 'optuna' # データベースの名前
     optuna_db_path = 'sqlite:///' + os.path.dirname(os.path.realpath(__file__)) + '/result/optuna.db' # データベースの保存場所
@@ -487,20 +503,19 @@ if __name__ == '__main__':
     else:
         study = optuna.create_study(sampler=sampler, direction='maximize')
     
-    #########記録ファイル作成########################################################
+    # Optunaの記録ファイル作成
     dt = datetime.now() # 現在時刻の取得
     dtstr = dt.strftime('%m-%d_%H[h]%M[m]%S[s]') # y(year), m(month), d(day), H(hour), M(minute), S(second)
-    f_learning_file =  os.path.dirname(os.path.realpath(__file__)) + '/result/' # os.path.dirname(os.path.realpath(__file__)) ← カレントディレクトリのパス
-    f_learning_name = f_learning_file + 'optuna_' + dtstr + '.txt'
-    if not os.path.exists(f_learning_file):
-        os.makedirs(f_learning_file)
+    f_optuna_file =  os.path.dirname(os.path.realpath(__file__)) + '/result/' # os.path.dirname(os.path.realpath(__file__)) ← カレントディレクトリのパス
+    f_optuna_name = f_optuna_file + 'optuna_' + dtstr + '.txt'
+    if not os.path.exists(f_optuna_file):
+        os.makedirs(f_optuna_file)
     text = [
         "trial_size: " + str(trial_size) + "\n",
         "Target: " + Target + "\n\n"
     ]
-    with open(f_learning_name, 'w') as f: # ファイルに属性を書き込む
+    with open(f_optuna_name, 'w') as f: # ファイルに属性を書き込む
         f.writelines(text)
-    ################################################################################
 
     # 探索開始時間
     time_optuna = time.time()
@@ -516,14 +531,18 @@ if __name__ == '__main__':
     else: # スタンダード
         study.optimize(main, n_trials=trial_size)
 
-    # 探索時間の取得と記録
+    # 探索時間の記録
     seconds = int(time.time() - time_optuna)
     m, s = divmod(seconds, 60)
     h, m = divmod(m, 60)
+    seconds_trial = int(seconds / trial_size)
+    m_trial, s_trial = divmod(seconds_trial, 60)
+    h_trial, m_trial = divmod(m_trial, 60)
     text = [
-        "time: " + str(seconds) + "[s], " + str(h) + ":" + str(m) + ":" + str(s) + "[hour:min:sec]"
+        "TOTAL> time: " + str(seconds) + "[s], " + str(h) + ":" + str(m) + ":" + str(s) + "[hour:min:sec]\n", 
+        "TRIAL> time: " + str(seconds_trial) + "[s], " + str(h_trial) + ":" + str(m_trial) + ":" + str(int(s_trial)) + "[hour:min:sec]"
     ]
-    with open(f_learning_name, 'a') as f:
+    with open(f_optuna_name, 'a') as f:
         f.writelines(text)
 
     # ベストパラメータ・スコアの表示
