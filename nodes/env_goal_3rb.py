@@ -635,25 +635,12 @@ class Env():
     def recovery_change_action(self, e, lidar_num, action, state, model): # LiDARの数値が低い方向への行動を避ける
 
         ### ユーザー設定パラメータ ###
-        threshold = 0.3 # 動きを変える距離(LiDAR値)[m]
+        threshold = 0.35 # 動きを変える距離(LiDAR値)[m]
         probabilistic = False # True: リカバリー方策を確率的に利用する, False: リカバリー方策を必ず利用する
         initial_probability = 1.0 # 最初の確率
         finish_episode = 999 # 方策を適応する最後のエピソード
         mode_change_episode = 11 # 行動変更のトリガーをLiDAR値からQ値に変えるエピソード
         ############################
-
-        ### 設定変更の実験 ###
-        if self.trials >= 12:
-            threshold = 0.45
-        elif self.trials >= 9:
-            threshold = 0.4
-        elif self.trials >= 6:
-            threshold = 0.35
-        elif self.trials >= 3:
-            threshold = 0.3
-        else:
-            threshold = 0.25
-        #######################
 
         # リカバリー方策の利用判定
         if not probabilistic and e <= finish_episode: # 必ず利用
