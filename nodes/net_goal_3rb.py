@@ -594,7 +594,7 @@ class Dueling_Q_Func(nn.Module):
 class Dueling_Q_Func_Optuna(nn.Module):
     def __init__(self, 
     conv_num, mid_layer_num, mid_units1, mid_units2, mid_units3, cnv_act, ful_act, 
-    n_actions, n_input_channels, n_added_input=0, img_width=48, img_height=27):
+    n_actions, n_input_channels, n_added_input, img_width, img_height):
         self.conv_num = conv_num
         self.mid_layer_num = mid_layer_num
         self.cnv_act = cnv_act

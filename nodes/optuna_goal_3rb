@@ -27,7 +27,7 @@ class Select: # Optunaのパラメータを管理するデータベースを操�
             'network', 'conv_num', 'mid_layer_num', 'mid_units1', 'mid_units2', 
             'mid_units3', 'cnv_act', 'ful_act', 'optimizer', 'batch_size', 
             'r_collision', 'r_just', 'r_near', 'r_goal', 'r_cost', 'r_passive', 
-            'Target', 'trials', 'trial_size'
+            'trials', 'trial_size'
             ]
 
         # データベース名の定義
@@ -61,128 +61,53 @@ class Select: # Optunaのパラメータを管理するデータベースを操�
             ''', (param_name,))
         self.conn.commit()
 
-    def choice_param(self, trial, trials, Target, trial_size): # Optunaのパラメータ選択
+    def choice_param(self, trial, trials, trial_size): # Optunaのパラメータ選択
 
-        network='DCNN' # CNN or DCNN or MLP
-
-        if network == 'CNN':
-            if Target=='both' or Target=='network':
-                #畳み込み層,プーリング層の組み合わせを選択
-                conv_num = trial.suggest_categorical('conv_num', [1, 2, 3])
-
-                # 中間層数とユニット数の選択
-                mid_layer_num = trial.suggest_categorical('mid_layer_num', [1, 2, 3])
-                if mid_layer_num == 1:
-                    mid_units1 = int(trial.suggest_float("mid_units1", 50, 800, step=50))
-                    mid_units2 = None
-                    mid_units3 = None
-                elif mid_layer_num == 2:
-                    mid_units1 = int(trial.suggest_float("mid_units1", 400, 800, step=50))
-                    mid_units2 = int(trial.suggest_float("mid_units2", 50, 600, step=50))
-                    mid_units3 = None
-                elif mid_layer_num == 3:
-                    mid_units1 = int(trial.suggest_float("mid_units1", 400, 800, step=50))
-                    mid_units3 = int(trial.suggest_float("mid_units3", 400, 800, step=50))
-                    mid_units2 = int(trial.suggest_float("mid_units2", 50, 500, step=50))
-            else:
-                conv_num = None
-                mid_layer_num = None
-                mid_units1 = None
-                mid_units2 = None
-                mid_units3 = None
+        network = 'DCNN' # CNN or DCNN or MLP
         
-        if network == 'DCNN':
-            if Target=='both' or Target=='network':
-                #畳み込み層,プーリング層の組み合わせを選択
-                conv_num = trial.suggest_categorical('conv_num', [1, 2, 3])
+        if network in ['CNN', 'DCNN']:
+            #畳み込み層,プーリング層の組み合わせを選択
+            conv_num = trial.suggest_categorical('conv_num', [1, 2, 3])
 
-                # 中間層数とユニット数の選択
-                mid_layer_num = trial.suggest_categorical('mid_layer_num', [1, 2, 3])
-                if mid_layer_num == 1:
-                    mid_units1 = int(trial.suggest_float("mid_units1", 50, 800, step=1))
-                    mid_units2 = None
-                    mid_units3 = None
-                elif mid_layer_num == 2:
-                    mid_units1 = int(trial.suggest_float("mid_units1", 300, 800, step=1))
-                    mid_units2 = int(trial.suggest_float("mid_units2", 50, 600, step=1))
-                    mid_units3 = None
-                elif mid_layer_num == 3:
-                    mid_units1 = int(trial.suggest_float("mid_units1", 300, 800, step=1))
-                    mid_units3 = int(trial.suggest_float("mid_units3", 300, 800, step=1))
-                    mid_units2 = int(trial.suggest_float("mid_units2", 50, 500, step=1))
-            else:
-                conv_num = None
-                mid_layer_num = None
-                mid_units1 = None
-                mid_units2 = None
-                mid_units3 = None
-
-        if network == 'MLP':
-            if Target=='both' or Target=='network':
-                conv_num = None
-                # 中間層数とユニット数の選択
-                mid_layer_num = trial.suggest_categorical('mid_layer_num', [1, 2, 3])
-                if mid_layer_num == 1:
-                    mid_units1 = int(trial.suggest_float("mid_units1", 50, 850, step=100))
-                    mid_units2 = None
-                    mid_units3 = None
-                elif mid_layer_num == 2:
-                    mid_units1 = int(trial.suggest_float("mid_units1", 400, 800, step=100))
-                    mid_units2 = int(trial.suggest_float("mid_units2", 50, 650, step=100))
-                    mid_units3 = None
-                elif mid_layer_num == 3:
-                    mid_units1 = int(trial.suggest_float("mid_units1", 400, 800, step=100))
-                    mid_units3 = int(trial.suggest_float("mid_units3", 400, 800, step=100))
-                    mid_units2 = int(trial.suggest_float("mid_units2", 50, 850, step=100))
-            else:
-                conv_num = None
-                mid_layer_num = None
-                mid_units1 = None
-                mid_units2 = None
-                mid_units3 = None
+        # 中間層数とユニット数の選択
+        mid_layer_num = trial.suggest_categorical('mid_layer_num', [1, 2, 3])
+        if mid_layer_num == 1:
+            mid_units1 = int(trial.suggest_float("mid_units1", 50, 800, step=1))
+            mid_units2 = None
+            mid_units3 = None
+        elif mid_layer_num == 2:
+            mid_units1 = int(trial.suggest_float("mid_units1", 300, 800, step=1))
+            mid_units2 = int(trial.suggest_float("mid_units2", 50, 600, step=1))
+            mid_units3 = None
+        elif mid_layer_num == 3:
+            mid_units1 = int(trial.suggest_float("mid_units1", 300, 800, step=1))
+            mid_units3 = int(trial.suggest_float("mid_units3", 300, 800, step=1))
+            mid_units2 = int(trial.suggest_float("mid_units2", 50, 500, step=1))
 
         # fully-connected layerとconvolutionの活性化関数の選択
-        if Target == 'both' or Target == 'network':
-            if network == 'CNN' or network == 'DCNN':
-                # cnv_act_name = trial.suggest_categorical('activation_cnv', ['F.relu', 'F.elu', 'F.selu', 'F.l_relu'])
-                cnv_act = 'F.relu'
-            # ful_act_name = trial.suggest_categorical('activation_ful', ['F.relu', 'F.elu', 'F.selu', 'F.l_relu'])
-            ful_act = 'F.relu'
-        else:
-            cnv_act = None
-            ful_act = None
+        if network in ['CNN', 'DCNN']:
+            # cnv_act_name = trial.suggest_categorical('activation_cnv', ['F.relu', 'F.elu', 'F.selu', 'F.l_relu'])
+            cnv_act = 'F.relu'
+        # ful_act_name = trial.suggest_categorical('activation_ful', ['F.relu', 'F.elu', 'F.selu', 'F.l_relu'])
+        ful_act = 'F.relu'
 
         # 最適化アルゴリズムの選択
-        if Target == 'both' or Target == 'network':
-            # optimizer_names = ['RAdam', 'Adagrad', 'Adadelta', 'RMSprop']
-            # optimizer = trial.suggest_categorical('optimizer', optimizer_names)
-            optimizer = 'RAdam'
-        else:
-            optimizer = 'RAdam'
+        # optimizer = trial.suggest_categorical('optimizer', ['RAdam', 'Adagrad', 'Adadelta', 'RMSprop'])
+        optimizer = 'RAdam'
 
         # バッチサイズの選択
-        if Target == 'both' or Target == 'network':
-            # batch_size = trial.suggest_categorical("batch_size",[8, 16, 32, 64, 128])
-            batch_size = 128
-        else:
-            batch_size = 128
+        # batch_size = trial.suggest_categorical("batch_size", [8, 16, 32, 64, 128])
+        batch_size = 128
 
         # 報酬の選択
-        if Target == 'both' or Target == 'reward':
-            r_collision = trial.suggest_float("r_collision", 50, 2000, step=10)
-            r_just = trial.suggest_float("r_just", 0.1, 0.7, step=0.01)
-            r_near = trial.suggest_float("r_near", 1, 7, step=0.1)
-            r_goal = trial.suggest_float("r_goal", 50, 2000, step=10)
-            r_cost = trial.suggest_float("r_cost", 1, 50, step=1)
-            r_passive = trial.suggest_float("r_passive", 50, 100, step=1)
-        else:
-            r_collision = None
-            r_just = None
-            r_near = None
-            r_goal = None
-            r_cost = None
-            r_passive = None
+        r_collision = trial.suggest_float("r_collision", 50, 2000, step=10)
+        r_just = trial.suggest_float("r_just", 0.1, 0.7, step=0.01)
+        r_near = trial.suggest_float("r_near", 1, 7, step=0.1)
+        r_goal = trial.suggest_float("r_goal", 50, 2000, step=10)
+        r_cost = trial.suggest_float("r_cost", 0, 50, step=1)
+        r_passive = trial.suggest_float("r_passive", 0, 100, step=1)
         
+        # データベースに選択したパラメータを格納する
         for name in self.parameters:
             self.set_parameter_value(name, locals()[name])
 
@@ -405,7 +330,7 @@ def main(trial):
     trials = len(study.trials) - 1 # トライアル数(0から始まる)
     print('\ntrial ' + str(trials) + ' start')
 
-    select.choice_param(trial, trials, Target, trial_size) # Optunaによるパラメータの選択
+    select.choice_param(trial, trials, trial_size) # Optunaによるパラメータの選択
 
     print('params = ' + str(study.trials[-1].params)) # Optunaが選択したパラメータの出力
 
@@ -485,16 +410,24 @@ if __name__ == '__main__':
 
     ### Optunaの設定 ###########
     trial_size = 9 # 実行するトライアル数
-    Target = 'both' # 'both' or 'network' or 'reward'
     save_study = False # Optunaの内容をデータベースに保存
-    load_study = False# 前回のOptunaの内容を引き継ぐ
+    load_study = False # 前回のOptunaの内容を引き継ぐ
     shutdown = True # プログラム終了時にPCの電源を落とすか否か
     fix = True # 初期トライアルのパラメータ値の固定(study.optimizeの直前でstudy.enqueue_trialを用いて追加してください)
     choice_param_only = True # 指定したパラメータのみを用いる
-    ############################
+    trial_size_choice = 3 # 指定したパラメータでの試行回数(1つの組み合わせあたり)
+
+    # 指定するパラメータの設定
+    if choice_param_only:
+        choice_params = [
+            {'conv_num': 3, 'mid_layer_num': 2, 'mid_units1': 451, 'mid_units2': 372, 'r_collision': 1340, 'r_just': 0.31, 'r_near': 4.6, 'r_goal': 290, 'r_cost': 1, 'r_passive': 0}, 
+            {'conv_num': 3, 'mid_layer_num': 2, 'mid_units1': 451, 'mid_units2': 372, 'r_collision': 1340, 'r_just': 0.31, 'r_near': 4.6, 'r_goal': 290, 'r_cost': 0, 'r_passive': 1}
+        ]
+        trial_size = trial_size_choice * len(choice_params)
     
     """ 上位群の割合を減少させるTPE(initial_gamma: 最初の上位群の割合, final_gamma: 減少後の上位群の割合, stop_trial: 割合減少を止めるトライアル, random_trials: ランダムサーチのトライアル数) """
     sampler = DynamicGammaTPE(initial_gamma=0.7, final_gamma=0.1, stop_trial=50, random_trials=10)
+    ############################
 
     if load_study:
         study = optuna.load_study(study_name=optuna_db_name, storage=optuna_db_path, sampler=sampler)
@@ -510,10 +443,7 @@ if __name__ == '__main__':
     f_optuna_name = f_optuna_file + 'optuna_' + dtstr + '.txt'
     if not os.path.exists(f_optuna_file):
         os.makedirs(f_optuna_file)
-    text = [
-        "trial_size: " + str(trial_size) + "\n",
-        "Target: " + Target + "\n\n"
-    ]
+    text = ["trial_size: " + str(trial_size) + "\n\n"]
     with open(f_optuna_name, 'w') as f: # ファイルに属性を書き込む
         f.writelines(text)
 
@@ -522,17 +452,13 @@ if __name__ == '__main__':
 
     # 探索実行
     if choice_param_only: # 指定したパラメータのみを用いる
-        for i in range(trial_size):
-            study.enqueue_trial({'conv_num': 3, 'mid_layer_num': 2, 'mid_units1': 451, 'mid_units2': 372, 'r_collision': 1340, 'r_just': 0.31, 'r_near': 4.6, 'r_goal': 290, 'r_cost': 0, 'r_passive': 0})
-            study.optimize(main, n_trials=1)
-        for i in range(trial_size):
-            study.enqueue_trial({'conv_num': 3, 'mid_layer_num': 2, 'mid_units1': 451, 'mid_units2': 372, 'r_collision': 1340, 'r_just': 0.31, 'r_near': 4.6, 'r_goal': 290, 'r_cost': 17, 'r_passive': 0})
-            study.optimize(main, n_trials=1)
-        for i in range(trial_size):
-            study.enqueue_trial({'conv_num': 3, 'mid_layer_num': 2, 'mid_units1': 451, 'mid_units2': 372, 'r_collision': 1340, 'r_just': 0.31, 'r_near': 4.6, 'r_goal': 290, 'r_cost': 0, 'r_passive': 70})
-            study.optimize(main, n_trials=1)
+        for choice_param in choice_params:
+            for i in range(trial_size_choice):
+                study.enqueue_trial(choice_param)
+                study.optimize(main, n_trials=1)
     elif fix and len(study.trials) == 0: # 初期値の固定
-        study.enqueue_trial({'conv_num': 2, 'mid_layer_num': 2, 'mid_units1': 512, 'mid_units2': 512, 'r_collision': 1000, 'r_just': 0.4, 'r_near': 5, 'r_goal': 2000, 'r_cost': 10, 'r_passive': 50})
+        for choice_param in choice_params:
+            study.enqueue_trial(choice_param)
         study.optimize(main, n_trials=trial_size)
     else: # スタンダード
         study.optimize(main, n_trials=trial_size)

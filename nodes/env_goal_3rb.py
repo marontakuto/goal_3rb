@@ -20,28 +20,33 @@ from sensor_msgs.msg import Image, CompressedImage
 import ros_numpy
 
 class Env():
-    def __init__(self, mode, robot_n, lidar_num, input_list, teleport, 
+    def __init__(self, mode, robot_n, lidar_num, input_lidar, lidar_past_step, 
+                 input_cam, cam_past_step, teleport, 
                  r_collision, r_just, r_near, r_goal, r_cost, r_passive, 
-                 Target, trials, mask_switch, display_image_normal, display_image_mask, 
-                 display_rb):
+                 trials, mask_switch, display_image_normal, display_image_mask, 
+                 display_rb, cam_width, cam_height):
         
         self.mode = mode
         self.robot_n = robot_n
         self.lidar_num = lidar_num
-        self.input_list = input_list
+        self.input_lidar = input_lidar
+        self.lidar_past_step = lidar_past_step
+        self.input_cam = input_cam
+        self.cam_past_step = cam_past_step
         self.teleport = teleport
-        self.previous_cam_list = deque([])
-        self.previous_lidar_list = deque([])
-        self.previous2_cam_list = deque([])
-        self.previous2_lidar_list = deque([])
+
+        self.cam_list = deque([])
+        self.lidar_list = deque([])
         self.pub_cmd_vel = rospy.Publisher('cmd_vel', Twist, queue_size=5)
         self.reset_proxy = rospy.ServiceProxy('gazebo/reset_simulation', Empty)
 
-        # カメラ画像のマスク処理
+        # カメラ画像
         self.mask_switch = mask_switch
         self.display_image_normal = display_image_normal
         self.display_image_mask = display_image_mask
         self.display_rb = display_rb
+        self.cam_width = cam_width
+        self.cam_height = cam_height
 
         # Optunaで選択された報酬値
         self.r_collision = r_collision
@@ -50,7 +55,6 @@ class Env():
         self.r_goal = r_goal
         self.r_cost = r_cost
         self.r_passive = r_passive
-        self.Target = Target
         self.trials = trials
 
         # LiDARについての設定
@@ -132,7 +136,7 @@ class Env():
                 img = np.frombuffer(img.data, np.uint8)
                 img = cv2.imdecode(img, cv2.IMREAD_COLOR) # カラー画像(BGR)
             
-            img = cv2.resize(img, (48, 27)) # 取得した画像を48×27[pixel]に変更
+            img = cv2.resize(img, (self.cam_width, self.cam_height)) # 取得した画像をcam_width×cam_height[pixel]に変更
 
             if self.display_image_normal and self.robot_n in self.display_rb:
                 self.display_image(img, f'camera_normal_{self.robot_n}')
@@ -185,49 +189,35 @@ class Env():
                     collision = False
         
         # 入力するカメラ画像の処理
-        if ('cam' in self.input_list) or ('previous_cam' in self.input_list) or ('previous2_cam' in self.input_list):
+        if self.input_cam:
             input_img = np.asarray(img, dtype=np.float32)
             input_img /= 255.0 # 画像の各ピクセルを255で割ることで0~1の値に正規化
             input_img = np.asarray(input_img.flatten())
             input_img = input_img.tolist()
+            self.cam_list.appendleft(input_img)
 
-            state_list = state_list + input_img # [現在]
-
-            if 'previous_cam' in self.input_list:
-                self.previous_cam_list.append(input_img)
-                if len(self.previous_cam_list) > 2: # [1step前 現在]の状態に保つ
-                    self.previous_cam_list.popleft() # 左端の要素を削除(2step前の情報を削除)
-                past_cam = self.previous_cam_list[0] # 1step前の画像
-                state_list = state_list + past_cam # [現在 1step前]
-
-                if 'previous2_cam' in self.input_list:
-                    self.previous2_cam_list.append(input_img)
-                    if len(self.previous2_cam_list) > 3: # [2step前 1step前 現在]の状態に保つ
-                        self.previous2_cam_list.popleft() # 左端の要素を削除(3step前の情報を削除)
-                    past_cam = self.previous2_cam_list[0] # 2step前の画像
-                    state_list = state_list + past_cam # [現在 1step前 2step前]
+            state_list_cam = [item for sublist in self.cam_list for item in sublist]
+            if len(self.cam_list) == (self.cam_past_step + 1):
+                self.cam_list.pop()
+            else:
+                for i in range((self.cam_past_step + 1) - len(self.cam_list)):
+                    state_list_cam = self.cam_list[0] + state_list_cam
 
         # 入力するLiDAR値の処理
-        if ('lidar' in self.input_list) or ('previous_lidar' in self.input_list) or ('previous2_lidar' in self.input_list):
+        if self.input_lidar:
             input_scan = [] # 正規化したLiDAR値を格納するリスト
             for i in range(len(scan)): # lidar値の正規化
                 input_scan.append((scan[i] - self.range_margin) / (self.lidar_max - self.range_margin))
+            self.lidar_list.appendleft(input_scan)
 
-            state_list = state_list + input_scan # [画像] + [現在]
-
-            if 'previous_lidar' in self.input_list:
-                self.previous_lidar_list.append(input_scan)
-                if len(self.previous_lidar_list) > 2: # [1step前 現在]の状態に保つ
-                    self.previous_lidar_list.popleft() # 左端の要素を削除(2step前の情報を削除)
-                past_scan = self.previous_lidar_list[0] # 1step前のLiDAR値
-                state_list = state_list + past_scan # [画像] + [現在 1step前]
-
-                if 'previous2_lidar' in self.input_list:
-                    self.previous2_lidar_list.append(input_scan)
-                    if len(self.previous2_lidar_list) > 3: # [2step前 1step前 現在]の状態に保つ
-                        self.previous2_lidar_list.popleft() # 左端の要素を削除(3step前の情報を削除)
-                    past_scan = self.previous2_lidar_list[0] # 2step前のLiDAR値
-                    state_list = state_list + past_scan # [画像] + [現在 1step前 2step前]
+            state_list_lidar = [item for sublist in self.lidar_list for item in sublist]
+            if len(self.lidar_list) == (self.lidar_past_step + 1):
+                self.lidar_list.pop()
+            else:
+                for i in range((self.lidar_past_step + 1) - len(self.lidar_list)):
+                    state_list_lidar = self.lidar_list[0] + state_list_lidar
+        
+        state_list = state_list_cam + state_list_lidar
         
         return state_list, scan, collision, goal, goal_num
    
@@ -238,28 +228,16 @@ class Env():
         just_count = 0
         color_num = goal_num
 
-        if self.Target == 'both' or self.Target == 'reward':
-            if goal:
-                reward += self.r_goal + self.r_cost
-                just_count = 1
-            elif collision:
-                reward -= self.r_collision
-            if action in [3, 4]:
-                reward -= self.r_passive
-            reward -= self.r_cost
-            reward += goal_num * self.r_just
-            reward -= min(1 / (min(scan) + 0.01), 7) * self.r_near
-        else:
-            if goal:
-                reward += 50 + 10 # r_goal + r_cost
-                just_count = 1
-            elif collision:
-                reward -= 50 # r_collision
-            if action in [3, 4]:
-                reward -= 50 # r_passive
-            reward -= 10 # r_cost
-            reward += goal_num * 1 # r_just
-            reward -= min(1 / (min(scan) + 0.01), 7) * 1 # r_near
+        if goal:
+            reward += self.r_goal + self.r_cost
+            just_count = 1
+        elif collision:
+            reward -= self.r_collision
+        if action in [3, 4]:
+            reward -= self.r_passive
+        reward -= self.r_cost
+        reward += goal_num * self.r_just
+        reward -= min(1 / (min(scan) + 0.01), 7) * self.r_near
         
         return reward, color_num, just_count
 
