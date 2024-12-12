@@ -415,13 +415,12 @@ if __name__ == '__main__':
     shutdown = True # プログラム終了時にPCの電源を落とすか否か
     fix = True # 初期トライアルのパラメータ値の固定(study.optimizeの直前でstudy.enqueue_trialを用いて追加してください)
     choice_param_only = True # 指定したパラメータのみを用いる
-    trial_size_choice = 3 # 指定したパラメータでの試行回数(1つの組み合わせあたり)
+    trial_size_choice = 10 # 指定したパラメータでの試行回数(1つの組み合わせあたり)
 
     # 指定するパラメータの設定
     if choice_param_only:
         choice_params = [
-            {'conv_num': 3, 'mid_layer_num': 2, 'mid_units1': 451, 'mid_units2': 372, 'r_collision': 1340, 'r_just': 0.31, 'r_near': 4.6, 'r_goal': 290, 'r_cost': 1, 'r_passive': 0}, 
-            {'conv_num': 3, 'mid_layer_num': 2, 'mid_units1': 451, 'mid_units2': 372, 'r_collision': 1340, 'r_just': 0.31, 'r_near': 4.6, 'r_goal': 290, 'r_cost': 0, 'r_passive': 1}
+            {'conv_num': 3, 'mid_layer_num': 2, 'mid_units1': 451, 'mid_units2': 372, 'r_collision': 1340, 'r_just': 0.31, 'r_near': 4.6, 'r_goal': 290, 'r_cost': 17, 'r_passive': 70}
         ]
         trial_size = trial_size_choice * len(choice_params)
     
