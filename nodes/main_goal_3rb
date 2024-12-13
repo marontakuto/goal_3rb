@@ -420,6 +420,7 @@ class ReinforceAgent():
         r_just_count = sum(r_just_list) / len(r_just_list)
         color_count = sum(color_list) / len(color_list)
         step_count = sum(step_list) / len(step_list)
+        reward_ave = sum(old_score) / len(old_score)
 
         # ロボットの評価値を算出
         a = 0.8
@@ -430,8 +431,8 @@ class ReinforceAgent():
         print('finish test (robot' + str(self.robot_n) + ': score=' + str(round(score, 2)) + ', collision=' + str(round(collisions, 2)) + ', step=' + str(round(step_count, 2)) + ', goal=' + str(round(r_just_count, 2)) + ', test_episode=' + str(test_e) + ')')
         
         # 評価の書き込み
-        data = [[str(test_e), str(step_count), str(collisions), str(r_just_count), str(score)]]
-        columns = ['episodes', 'step_ave', 'collisions_ave', 'goal_ave', 'evaluation']
+        data = [[str(test_e), str(step_count), str(reward_ave), str(collisions), str(r_just_count), str(score)]]
+        columns = ['episodes', 'step_ave', 'reward_ave', 'collisions_ave', 'goal_ave', 'evaluation']
         data = pd.DataFrame(data, columns=columns)
         excel(data, columns, f_evaluate_name)
 
@@ -587,7 +588,7 @@ if __name__ == '__main__':
         # ディレクトリがない場合、作成する
         if not os.path.exists(f_evaluate_file):
             os.makedirs(f_evaluate_file)
-        columns = ['trials', 'episodes', 'step_ave', 'collisions_ave', 'goal_ave', 'evaluation']
+        columns = ['trials', 'episodes', 'step_ave', 'reward_ave', 'collisions_ave', 'goal_ave', 'evaluation']
         df = pd.DataFrame(columns=columns)
         df.to_excel(f_evaluate_name, index=False)
 
