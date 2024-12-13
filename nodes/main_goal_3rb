@@ -629,6 +629,7 @@ if __name__ == '__main__':
         r_goal = get_value_by_name('r_goal')
         r_cost = get_value_by_name('r_cost')
         r_passive = get_value_by_name('r_passive')
+        distance = get_value_by_name('distance')
         trials = get_value_by_name('trials')
         trial_size = get_value_by_name('trial_size')
 
@@ -637,7 +638,7 @@ if __name__ == '__main__':
         env = Env(agent.mode, agent.robot_n, agent.lidar_num, agent.input_lidar, agent.lidar_past_step, 
                   agent.input_cam, agent.cam_past_step, 
                   agent.teleport, r_collision, r_just, r_near, r_goal, r_cost, 
-                  r_passive, trials, agent.mask_switch, agent.display_image_normal, 
+                  r_passive, distance, trials, agent.mask_switch, agent.display_image_normal, 
                   agent.display_image_mask, agent.display_rb, agent.cam_width, agent.cam_height)
         
         # テストを行う回数を記録

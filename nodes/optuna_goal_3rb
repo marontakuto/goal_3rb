@@ -27,7 +27,7 @@ class Select: # Optunaのパラメータを管理するデータベースを操�
             'network', 'conv_num', 'mid_layer_num', 'mid_units1', 'mid_units2', 
             'mid_units3', 'cnv_act', 'ful_act', 'optimizer', 'batch_size', 
             'r_collision', 'r_just', 'r_near', 'r_goal', 'r_cost', 'r_passive', 
-            'trials', 'trial_size'
+            'distance', 'trials', 'trial_size'
             ]
 
         # データベース名の定義
@@ -100,12 +100,33 @@ class Select: # Optunaのパラメータを管理するデータベースを操�
         batch_size = 128
 
         # 報酬の選択
-        r_collision = trial.suggest_float("r_collision", 50, 2000, step=10)
-        r_just = trial.suggest_float("r_just", 0.1, 0.7, step=0.01)
-        r_near = trial.suggest_float("r_near", 1, 7, step=0.1)
-        r_goal = trial.suggest_float("r_goal", 50, 2000, step=10)
-        r_cost = trial.suggest_float("r_cost", 0, 50, step=1)
-        r_passive = trial.suggest_float("r_passive", 0, 100, step=1)
+        if True: # trial.suggest_categorical('r_collision_exis', [True, False])
+            r_collision = trial.suggest_float("r_collision", 50, 2000, step=10)
+        else:
+            r_collision = 0
+        if trial.suggest_categorical('r_just_exis', [True, False]):
+            r_just = trial.suggest_float("r_just", 0.1, 0.7, step=0.01)
+        else:
+            r_just = 0
+        if trial.suggest_categorical('r_near_exis', [True, False]):
+            r_near = trial.suggest_float("r_near", 1, 7, step=0.1)
+        else:
+            r_near = 0
+        if trial.suggest_categorical('r_goal_exis', [True, False]):
+            r_goal = trial.suggest_float("r_goal", 50, 2000, step=10)
+        else:
+            r_goal = 0
+        if trial.suggest_categorical('r_cost_exis', [True, False]):
+            r_cost = trial.suggest_float("r_cost", 1, 50, step=1)
+        else:
+            r_cost = 0
+        if trial.suggest_categorical('r_passive_exis', [True, False]):
+            r_passive = trial.suggest_float("r_passive", 1, 100, step=1)
+        else:
+            r_passive = 0
+
+        # リカバリー方策のしきい値(距離[m])
+        distance = trial.suggest_float("distance", 0, 0.6, step=0.01)
         
         # データベースに選択したパラメータを格納する
         for name in self.parameters:
@@ -410,7 +431,7 @@ if __name__ == '__main__':
     optuna_db_path = 'sqlite:///' + os.path.dirname(os.path.realpath(__file__)) + '/result/optuna.db' # データベースの保存場所
 
     ### Optunaの設定 ###########
-    trial_size = 80 # 実行するトライアル数
+    trial_size = 20 # 実行するトライアル数
     save_study = True # Optunaの内容をデータベースに保存
     load_study = False # 前回のOptunaの内容を引き継ぐ
     shutdown = True # プログラム終了時にPCの電源を落とすか否か
@@ -420,10 +441,14 @@ if __name__ == '__main__':
 
     # 指定するパラメータの設定
     choice_params = [
-        {'conv_num': 3, 'mid_layer_num': 2, 'mid_units1': 451, 'mid_units2': 372, 'r_collision': 1340, 'r_just': 0.31, 'r_near': 4.6, 'r_goal': 290, 'r_cost': 17, 'r_passive': 70}
+        {'conv_num': 3, 'mid_layer_num': 2, 'mid_units1': 451, 'mid_units2': 372, 
+         'r_collision': 1340, 'r_just_exis': True, 'r_just': 0.31, 'r_near_exis': True, 'r_near': 4.6, 
+         'r_goal_exis': True, 'r_goal': 290, 'r_cost_exis': True, 'r_cost': 17, 
+         'r_passive_exis': True, 'r_passive': 70, 'distance': 0.25}
     ]
     
-    """ 上位群の割合を減少させるTPE(initial_gamma: 最初の上位群の割合, final_gamma: 減少後の上位群の割合, stop_trial: 割合減少を止めるトライアル, random_trials: ランダムサーチのトライアル数) """
+    """ 上位群の割合を減少させるTPE(initial_gamma: 最初の上位群の割合, 
+        final_gamma: 減少後の上位群の割合, stop_trial: 割合減少を止めるトライアル, random_trials: ランダムサーチのトライアル数) """
     sampler = DynamicGammaTPE(initial_gamma=0.7, final_gamma=0.1, stop_trial=50, random_trials=10)
     ############################
 

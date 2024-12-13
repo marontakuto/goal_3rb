@@ -22,7 +22,7 @@ import ros_numpy
 class Env():
     def __init__(self, mode, robot_n, lidar_num, input_lidar, lidar_past_step, 
                  input_cam, cam_past_step, teleport, 
-                 r_collision, r_just, r_near, r_goal, r_cost, r_passive, 
+                 r_collision, r_just, r_near, r_goal, r_cost, r_passive, distance, 
                  trials, mask_switch, display_image_normal, display_image_mask, 
                  display_rb, cam_width, cam_height):
         
@@ -48,13 +48,14 @@ class Env():
         self.cam_width = cam_width
         self.cam_height = cam_height
 
-        # Optunaで選択された報酬値
+        # Optunaで選択された値
         self.r_collision = r_collision
         self.r_just = r_just
         self.r_near = r_near
         self.r_goal = r_goal
         self.r_cost = r_cost
         self.r_passive = r_passive
+        self.distance = distance
         self.trials = trials
 
         # LiDARについての設定
@@ -613,7 +614,7 @@ class Env():
     def recovery_change_action(self, e, lidar_num, action, state, model): # LiDARの数値が低い方向への行動を避ける
 
         ### ユーザー設定パラメータ ###
-        threshold = 0.35 # 動きを変える距離(LiDAR値)[m]
+        threshold = self.distance # 動きを変える距離(LiDAR値)[m]
         probabilistic = False # True: リカバリー方策を確率的に利用する, False: リカバリー方策を必ず利用する
         initial_probability = 1.0 # 最初の確率
         finish_episode = 999 # 方策を適応する最後のエピソード
