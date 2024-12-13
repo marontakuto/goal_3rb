@@ -351,7 +351,7 @@ class Env():
                 XYZyaw = f
         
         # 以下テスト用
-        if num in [1, 2]:
+        if num in [1, 2, 3, 4, 5, 6]:
             if self.robot_n == 0:
                 XYZyaw = b
             elif self.robot_n == 1:

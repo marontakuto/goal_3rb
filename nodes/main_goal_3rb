@@ -38,9 +38,9 @@ class ReinforceAgent():
         self.load_rbuf = False # 保存したリプレイバッファを適用するか
 
         self.input_lidar = True # LiDAR値をネットワークに入力するか否か
-        self.lidar_past_step = 3 # 何ステップ前までのLiDAR値をネットワークに入力するか
+        self.lidar_past_step = 2 # 何ステップ前までのLiDAR値をネットワークに入力するか
         self.input_cam = True # カメラ画像をネットワークに入力するか否か
-        self.cam_past_step = 3 # 何ステップ前までのカメラ画像をネットワークに入力するか
+        self.cam_past_step = 2 # 何ステップ前までのカメラ画像をネットワークに入力するか
         self.cam_width = 48 # カメラ画像の横[pixel]
         self.cam_height = 27 # カメラ画像の縦[pixel]
         
@@ -548,8 +548,8 @@ def get_value_by_name(name): # データベースの情報を適切な型に直�
 if __name__ == '__main__':
     rospy.init_node('main_goal_3rb')
 
-    training = True # 学習の有無
-    evaluation = True # テストの有無(ここだけTrueにしたら自動的にロードしたモデルでテストになります)
+    training = False # 学習の有無
+    evaluation = False # テストの有無(ここだけTrueにしたら自動的にロードしたモデルでテストになります)
     demonstration = False # デモンストレーションの有無
     test_num = 3 # テストする回数(training, evaluation, agent.all_episode_test が True の場合は agent.episode が定義されます)
 
@@ -664,13 +664,13 @@ if __name__ == '__main__':
         if evaluation:
             score_list = []
             if 'test_episodes' not in locals():
-                test_episodes = list(1000, 1000 + test_num)
+                test_episodes = list(range(1000, 1000 + test_num))
             for test_e in test_episodes:
                 score = agent.evaluate(test_e)  # テストの実行
                 score_list.append([score, test_e])
         if demonstration:
             agent.demo() # デモンストレーションの実行
-        if not training and not evaluation and not demonstration and (agent.robot_n in agent.screen_list):
+        if (not training) and (not evaluation) and (not demonstration):
             print('training, evaluation, demonstration のどれかをTrueにしてください!')
             time.sleep(3)
         #######################################################

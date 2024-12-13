@@ -327,7 +327,8 @@ class Recode: # 記録ファイルの操作
 
 def main(trial):
 
-    trials = len(study.trials) - 1 # トライアル数(0から始まる)
+    # トライアル数を定義(0から始まる)
+    trials = trial.number
     print('\ntrial ' + str(trials) + ' start')
 
     select.choice_param(trial, trials, trial_size) # Optunaによるパラメータの選択
@@ -409,25 +410,28 @@ if __name__ == '__main__':
     optuna_db_path = 'sqlite:///' + os.path.dirname(os.path.realpath(__file__)) + '/result/optuna.db' # データベースの保存場所
 
     ### Optunaの設定 ###########
-    trial_size = 9 # 実行するトライアル数
+    trial_size = 10 # 実行するトライアル数
     save_study = False # Optunaの内容をデータベースに保存
     load_study = False # 前回のOptunaの内容を引き継ぐ
     shutdown = True # プログラム終了時にPCの電源を落とすか否か
     fix = True # 初期トライアルのパラメータ値の固定(study.optimizeの直前でstudy.enqueue_trialを用いて追加してください)
-    choice_param_only = True # 指定したパラメータのみを用いる
-    trial_size_choice = 10 # 指定したパラメータでの試行回数(1つの組み合わせあたり)
+    choice_param_only = False # 指定したパラメータのみを用いる
+    trial_size_choice = 3 # 指定したパラメータでの試行回数(1つの組み合わせあたり)
 
     # 指定するパラメータの設定
-    if choice_param_only:
-        choice_params = [
-            {'conv_num': 3, 'mid_layer_num': 2, 'mid_units1': 451, 'mid_units2': 372, 'r_collision': 1340, 'r_just': 0.31, 'r_near': 4.6, 'r_goal': 290, 'r_cost': 17, 'r_passive': 70}
-        ]
-        trial_size = trial_size_choice * len(choice_params)
+    choice_params = [
+        {'conv_num': 3, 'mid_layer_num': 2, 'mid_units1': 451, 'mid_units2': 372, 'r_collision': 1340, 'r_just': 0.31, 'r_near': 4.6, 'r_goal': 290, 'r_cost': 17, 'r_passive': 70}, 
+        {'conv_num': 3, 'mid_layer_num': 2, 'mid_units1': 451, 'mid_units2': 372, 'r_collision': 1340, 'r_just': 0.31, 'r_near': 4.6, 'r_goal': 200, 'r_cost': 0, 'r_passive': 0}
+    ]
     
     """ 上位群の割合を減少させるTPE(initial_gamma: 最初の上位群の割合, final_gamma: 減少後の上位群の割合, stop_trial: 割合減少を止めるトライアル, random_trials: ランダムサーチのトライアル数) """
     sampler = DynamicGammaTPE(initial_gamma=0.7, final_gamma=0.1, stop_trial=50, random_trials=10)
     ############################
 
+    if choice_param_only:
+        trial_size = trial_size_choice * len(choice_params)
+
+    # Optunaの設定を定義
     if load_study:
         study = optuna.load_study(study_name=optuna_db_name, storage=optuna_db_path, sampler=sampler)
     elif save_study:
