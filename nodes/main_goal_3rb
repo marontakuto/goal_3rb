@@ -65,6 +65,7 @@ class ReinforceAgent():
         self.recovery = True # リカバリー方策を適用するか否か
         self.teleport = True # 衝突時は空いたスペースに再配置するか否か
         self.all_episode_test = True # すべてのエピソードをテスト
+        self.robot_coordinate_recode = False # テストでのロボットの座標の記録
 
         # ### オプション有無の実験 ###
         # if trials >= 9:
@@ -312,6 +313,9 @@ class ReinforceAgent():
         color_list = []
         step_list = []
 
+        if self.robot_coordinate_recode:
+            env.coordinate_file()
+
         start_time = time.time()
 
         if test_e >= 1000: # 指定されたモデルのロード
@@ -369,6 +373,9 @@ class ReinforceAgent():
                     elif t == self.test_step:
                         done = True
                     
+                    if self.robot_coordinate_recode:
+                        env.coordinate_get()
+                    
                     if done:
                         # 時間を計算
                         m, s = divmod(int(time.time() - start_time), 60)
@@ -401,6 +408,9 @@ class ReinforceAgent():
                         r_just_list.append(r_just_count)
                         color_list.append(color_count)
                         step_list.append(t_eval)
+
+                        if self.robot_coordinate_recode:
+                            env.coordinate_recode(test_e, eval_e)
 
                         # 他ロボットが右のエリアにいることを確認することで同期を取る
                         if self.mode == 'sim':

@@ -126,7 +126,7 @@ class Select: # Optunaのパラメータを管理するデータベースを操�
             r_passive = 0
 
         # リカバリー方策のしきい値(距離[m])
-        distance = trial.suggest_float("distance", 0, 0.6, step=0.01)
+        distance = trial.suggest_float("distance", 0.15, 0.6, step=0.01)
         
         # データベースに選択したパラメータを格納する
         for name in self.parameters:
@@ -431,7 +431,7 @@ if __name__ == '__main__':
     optuna_db_path = 'sqlite:///' + os.path.dirname(os.path.realpath(__file__)) + '/result/optuna.db' # データベースの保存場所
 
     ### Optunaの設定 ###########
-    trial_size = 20 # 実行するトライアル数
+    trial_size = 80 # 実行するトライアル数
     save_study = True # Optunaの内容をデータベースに保存
     load_study = False # 前回のOptunaの内容を引き継ぐ
     shutdown = True # プログラム終了時にPCの電源を落とすか否か

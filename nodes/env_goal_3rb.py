@@ -19,6 +19,10 @@ import cv2
 from sensor_msgs.msg import Image, CompressedImage
 import ros_numpy
 
+import os
+import sys
+sys.path.append(os.path.dirname(os.path.abspath(os.path.dirname(__file__))))
+
 class Env():
     def __init__(self, mode, robot_n, lidar_num, input_lidar, lidar_past_step, 
                  input_cam, cam_past_step, teleport, 
@@ -72,6 +76,8 @@ class Env():
             self.goal_color = 'yellow'
         
         self.previous_goal = None
+
+        self.path = []  # 座標を記録するリスト
 
     def get_lidar(self, retake=False): # lidar情報の取得
         if retake:
@@ -445,6 +451,34 @@ class Env():
             time.sleep(0.1) # 配置後すぐに行動させた場合は配置前の情報が使われることがあるため数秒待機
 
     # 以降追加システム
+    def coordinate_file(self):
+        f_coordinate_file =  os.path.dirname(os.path.realpath(__file__)) + '/result/' # os.path.dirname(os.path.realpath(__file__)) ← カレントディレクトリのパス
+        self.f_coordinate_name = f_coordinate_file + 'coordinate_robot' + str(self.robot_n) + '.txt'
+        if not os.path.exists(f_coordinate_file):
+            os.makedirs(f_coordinate_file)
+        with open(self.f_coordinate_name, 'w') as f: # ファイルに属性を書き込む
+            f.writelines(f'robot {self.robot_n}' + '\n\n')
+
+    def coordinate_get(self): # ロボットの座標の記録
+        ros_data = None
+        while ros_data is None:
+            try:
+                ros_data = rospy.wait_for_message('/gazebo/model_states', ModelStates, timeout=1) # ROSデータの取得
+            except:
+                pass
+        index = ros_data.name.index(f'tb3_{self.robot_n}') # ロボットのデータの配列番号
+        coordinate = [ros_data.pose[index].position.x, ros_data.pose[index].position.y] # ロボットの座標
+        self.path.append(coordinate)  # 座標をリストに追加
+    
+    def coordinate_recode(self, test_e, eval_e, phase):
+        text = [
+            f"episode: {test_e}, num: {eval_e}\n", 
+            str(self.path) + '\n\n'
+        ]
+        with open(self.f_coordinate_name, 'a') as f:
+            f.writelines(text)
+        self.path = []
+
     def goal_mask(self, img): # 目標ゴールを緑に, 他のゴールを黒に変換
 
         goal_num = 0
