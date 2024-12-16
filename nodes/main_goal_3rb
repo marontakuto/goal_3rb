@@ -64,7 +64,7 @@ class ReinforceAgent():
         self.screen_list = [2] # 学習経過を出力するロボットの識別番号
         self.recovery = True # リカバリー方策を適用するか否か
         self.teleport = True # 衝突時は空いたスペースに再配置するか否か
-        self.all_episode_test = True # すべてのエピソードをテスト
+        self.all_episode_test = False # すべてのエピソードをテスト
         self.robot_coordinate_recode = False # テストでのロボットの座標の記録
 
         # ### オプション有無の実験 ###
