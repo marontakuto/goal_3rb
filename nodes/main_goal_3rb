@@ -645,6 +645,7 @@ if __name__ == '__main__':
         distance = get_value_by_name('distance')
         trials = get_value_by_name('trials')
         trial_size = get_value_by_name('trial_size')
+        start_trial = get_value_by_name('start_trial')
 
         agent = ReinforceAgent()
 
@@ -708,5 +709,5 @@ if __name__ == '__main__':
             to_optuna.close()
         
         # 最後のトライアルでループを抜ける
-        if trials + 1 == trial_size:
+        if trials + 1 >= trial_size + start_trial:
             break

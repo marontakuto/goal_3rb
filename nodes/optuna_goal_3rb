@@ -27,7 +27,7 @@ class Select: # Optunaのパラメータを管理するデータベースを操�
             'network', 'conv_num', 'mid_layer_num', 'mid_units1', 'mid_units2', 
             'mid_units3', 'cnv_act', 'ful_act', 'optimizer', 'batch_size', 
             'r_collision', 'r_just', 'r_near', 'r_goal', 'r_cost', 'r_passive', 
-            'distance', 'trials', 'trial_size'
+            'distance', 'trials', 'trial_size', 'start_trial'
             ]
 
         # データベース名の定義
@@ -61,7 +61,7 @@ class Select: # Optunaのパラメータを管理するデータベースを操�
             ''', (param_name,))
         self.conn.commit()
 
-    def choice_param(self, trial, trials, trial_size): # Optunaのパラメータ選択
+    def choice_param(self, trial, trials, trial_size, start_trial): # Optunaのパラメータ選択
 
         network = 'DCNN' # CNN or DCNN or MLP
         
@@ -352,7 +352,7 @@ def main(trial):
     trials = trial.number
     print('\ntrial ' + str(trials) + ' start')
 
-    select.choice_param(trial, trials, trial_size) # Optunaによるパラメータの選択
+    select.choice_param(trial, trials, trial_size, start_trial) # Optunaによるパラメータの選択
 
     print('params = ' + str(study.trials[-1].params)) # Optunaが選択したパラメータの出力
 
@@ -432,8 +432,8 @@ if __name__ == '__main__':
 
     ### Optunaの設定 ###########
     trial_size = 30 # 実行するトライアル数
-    save_study = True # Optunaの内容をデータベースに保存
-    load_study = False # 前回のOptunaの内容を引き継ぐ
+    save_study = False # Optunaの内容をデータベースに保存
+    load_study = True # 前回のOptunaの内容を引き継ぐ
     shutdown = True # プログラム終了時にPCの電源を落とすか否か
     fix = True # 初期トライアルのパラメータ値の固定(study.optimizeの直前でstudy.enqueue_trialを用いて追加してください)
     choice_param_only = False # 指定したパラメータのみを用いる
@@ -473,6 +473,9 @@ if __name__ == '__main__':
     text = ["trial_size: " + str(trial_size) + "\n\n"]
     with open(f_optuna_name, 'w') as f: # ファイルに属性を書き込む
         f.writelines(text)
+    
+    # 最初のトライアル数
+    start_trial = len(study.trials)
 
     # 探索開始時間
     time_optuna = time.time()
