@@ -457,7 +457,7 @@ class Env():
         if not os.path.exists(f_coordinate_file):
             os.makedirs(f_coordinate_file)
         with open(self.f_coordinate_name, 'w') as f: # ファイルに属性を書き込む
-            f.writelines(f'robot {self.robot_n}' + '\n\n')
+            f.writelines(f'robot {self.robot_n}' + '\n\n' + '[\n')
 
     def coordinate_get(self): # ロボットの座標の記録
         ros_data = None
@@ -470,11 +470,12 @@ class Env():
         coordinate = [ros_data.pose[index].position.x, ros_data.pose[index].position.y] # ロボットの座標
         self.path.append(coordinate)  # 座標をリストに追加
     
-    def coordinate_recode(self, test_e, eval_e, phase):
-        text = [
-            f"episode: {test_e}, num: {eval_e}\n", 
-            str(self.path) + '\n\n'
-        ]
+    def coordinate_recode(self, flag_last):
+        if flag_last:
+            text = [str(self.path) + '\n]\n\n']
+        else:
+            text = [str(self.path) + ', \n']
+        
         with open(self.f_coordinate_name, 'a') as f:
             f.writelines(text)
         self.path = []

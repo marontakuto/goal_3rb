@@ -410,7 +410,10 @@ class ReinforceAgent():
                         step_list.append(t_eval)
 
                         if self.robot_coordinate_recode:
-                            env.coordinate_recode(test_e, eval_e)
+                            flag_last = False
+                            if eval_e == self.eval_episode:
+                                flag_last = True
+                            env.coordinate_recode(flag_last)
 
                         # 他ロボットが右のエリアにいることを確認することで同期を取る
                         if self.mode == 'sim':
