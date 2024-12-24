@@ -38,16 +38,16 @@ class ReinforceAgent():
         self.load_rbuf = False # 保存したリプレイバッファを適用するか
 
         self.input_lidar = True # LiDAR値をネットワークに入力するか否か
-        self.lidar_past_step = 2 # 何ステップ前までのLiDAR値をネットワークに入力するか
+        self.lidar_past_step = past_step # 何ステップ前までのLiDAR値をネットワークに入力するか
         self.input_cam = True # カメラ画像をネットワークに入力するか否か
-        self.cam_past_step = 2 # 何ステップ前までのカメラ画像をネットワークに入力するか
+        self.cam_past_step = past_step # 何ステップ前までのカメラ画像をネットワークに入力するか
         self.cam_width = 48 # カメラ画像の横[pixel]
         self.cam_height = 27 # カメラ画像の縦[pixel]
         
         self.exploration = 'd_egreedy' # d_egreedy(decay_epsilon_greedy) or c_egreedy(constant_epsilon_greedy)
         self.lidar_num = 72 # DQNに入力するlidarの方向数(MAX: 360)
         self.action_size = 5 # 行動の種類数
-        self.episode = 50 # 40
+        self.episode = 45 # 40
         self.eval_episode = 6 # 6
         self.episode_step = 500 # 500
         self.test_step = 200 # 200
@@ -436,8 +436,8 @@ class ReinforceAgent():
         reward_ave = sum(old_score) / len(old_score)
 
         # ロボットの評価値を算出
-        a = 0.8
-        b = 0.2
+        a = 0.9
+        b = 0.1
         score = a * (100 * r_just_count) + b * (100 * (self.test_step - step_count) / self.test_step)
 
         # テスト平均の出力
@@ -578,7 +578,7 @@ if __name__ == '__main__':
     # 記録ファイル作成
     if training:
         # 学習ファイル
-        f_train_file = os.path.dirname(os.path.realpath(__file__)) + '/result/'
+        f_train_file = os.path.dirname(os.path.realpath(__file__)) + '/result/' + str(robot_n) + '/'
         f_train_name = f_train_file + str(robot_n) + "_goal_3rb_" + dtstr + "_train.xlsx"
         # ディレクトリがない場合、作成する
         if not os.path.exists(f_train_file):
@@ -588,7 +588,7 @@ if __name__ == '__main__':
         df.to_excel(f_train_name, index=False)
     if evaluation:
         # テストファイル
-        f_test_file =  os.path.dirname(os.path.realpath(__file__)) + '/result/'
+        f_test_file =  os.path.dirname(os.path.realpath(__file__)) + '/result/' + str(robot_n) + '/'
         f_test_name = f_test_file + str(robot_n) + "_goal_3rb_" + dtstr + "_test.xlsx"
         # ディレクトリがない場合、作成する
         if not os.path.exists(f_test_file):
@@ -598,7 +598,7 @@ if __name__ == '__main__':
         df.to_excel(f_test_name, index=False)
 
         # 評価ファイル
-        f_evaluate_file =  os.path.dirname(os.path.realpath(__file__)) + '/result/'
+        f_evaluate_file =  os.path.dirname(os.path.realpath(__file__)) + '/result/' + str(robot_n) + '/'
         f_evaluate_name = f_evaluate_file + str(robot_n) + "_goal_3rb_" + dtstr + "_evaluate.xlsx"
         # ディレクトリがない場合、作成する
         if not os.path.exists(f_evaluate_file):
@@ -646,6 +646,7 @@ if __name__ == '__main__':
         r_cost = get_value_by_name('r_cost')
         r_passive = get_value_by_name('r_passive')
         distance = get_value_by_name('distance')
+        past_step = get_value_by_name('past_step')
         trials = get_value_by_name('trials')
         trial_size = get_value_by_name('trial_size')
         start_trial = get_value_by_name('start_trial')

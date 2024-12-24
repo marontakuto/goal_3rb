@@ -201,28 +201,42 @@ class Env():
             input_img /= 255.0 # 画像の各ピクセルを255で割ることで0~1の値に正規化
             input_img = np.asarray(input_img.flatten())
             input_img = input_img.tolist()
-            self.cam_list.appendleft(input_img)
+
+            if len(self.cam_list) == (self.cam_past_step + 1):
+                if np.array_equal(input_img, self.cam_list[0]):
+                    pass
+                else:
+                    self.cam_list.appendleft(input_img)
+            else:
+                self.cam_list.appendleft(input_img)
+
+            if len(self.cam_list) > (self.cam_past_step + 1):
+                self.cam_list.pop()
 
             state_list_cam = [item for sublist in self.cam_list for item in sublist]
-            if len(self.cam_list) == (self.cam_past_step + 1):
-                self.cam_list.pop()
-            else:
-                for i in range((self.cam_past_step + 1) - len(self.cam_list)):
-                    state_list_cam = self.cam_list[0] + state_list_cam
+            for i in range((self.cam_past_step + 1) - len(self.cam_list)):
+                state_list_cam = self.cam_list[0] + state_list_cam
 
         # 入力するLiDAR値の処理
         if self.input_lidar:
             input_scan = [] # 正規化したLiDAR値を格納するリスト
             for i in range(len(scan)): # lidar値の正規化
                 input_scan.append((scan[i] - self.range_margin) / (self.lidar_max - self.range_margin))
-            self.lidar_list.appendleft(input_scan)
+            
+            if len(self.lidar_list) == (self.lidar_past_step + 1):
+                if np.array_equal(input_scan, self.lidar_list[0]):
+                    pass
+                else:
+                    self.lidar_list.appendleft(input_scan)
+            else:
+                self.lidar_list.appendleft(input_scan)
+
+            if len(self.lidar_list) > (self.lidar_past_step + 1):
+                self.lidar_list.pop()
 
             state_list_lidar = [item for sublist in self.lidar_list for item in sublist]
-            if len(self.lidar_list) == (self.lidar_past_step + 1):
-                self.lidar_list.pop()
-            else:
-                for i in range((self.lidar_past_step + 1) - len(self.lidar_list)):
-                    state_list_lidar = self.lidar_list[0] + state_list_lidar
+            for i in range((self.lidar_past_step + 1) - len(self.lidar_list)):
+                state_list_lidar = self.lidar_list[0] + state_list_lidar
         
         state_list = state_list_cam + state_list_lidar
         
@@ -282,6 +296,10 @@ class Env():
         self.pub_cmd_vel.publish(vel_cmd) # 実行
         state_list, scan, collision, goal, goal_num = self.getState() # 状態観測
         reward, color_num, just_count = self.setReward(scan, collision, goal, goal_num, action) # 報酬計算
+
+        if test and collision:
+            self.stop()
+            time.sleep(0.5)
 
         if not test: # テスト時でないときの処理
             if (collision or goal) and not self.teleport:
@@ -457,7 +475,7 @@ class Env():
         if not os.path.exists(f_coordinate_file):
             os.makedirs(f_coordinate_file)
         with open(self.f_coordinate_name, 'w') as f: # ファイルに属性を書き込む
-            f.writelines(f'robot {self.robot_n}' + '\n\n' + '[\n')
+            f.writelines('[')
 
     def coordinate_get(self): # ロボットの座標の記録
         ros_data = None
@@ -472,9 +490,9 @@ class Env():
     
     def coordinate_recode(self, flag_last):
         if flag_last:
-            text = [str(self.path) + '\n]\n\n']
+            text = [str(self.path) + ']\n']
         else:
-            text = [str(self.path) + ', \n']
+            text = [str(self.path) + ', ']
         
         with open(self.f_coordinate_name, 'a') as f:
             f.writelines(text)
