@@ -242,7 +242,7 @@ class Env():
         
         return state_list, scan, collision, goal, goal_num
    
-    def setReward(self, scan, collision, goal, goal_num,  action):
+    def setReward(self, scan, collision, goal, goal_num, action):
 
         reward = 0
         color_num = 0
