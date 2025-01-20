@@ -208,18 +208,21 @@ class ReinforceAgent():
 
             for t in range(1, self.episode_step + 1):
                 
-                action = self.model.act(state) # モデルに状態を渡して取るべき行動を算出
+                # モデルに状態を渡して行動を出力(CustomDoubleDQN.actを経由してCustomDoubleDQN.batch_actへ)
+                action = self.model.act(state)
 
                 ##### shielding(リカバリー方策) #####
                 if self.recovery and t >= 2:
                     if color_num < 50:
                         action = env.recovery_change_action(e, self.lidar_num, action, state, self.model.model) # LiDARの数値が低い方向への行動を避ける
+                        self.model.batch_last_action[0] = action # リプレイバッファに保存する行動を変更
                     pass
                 #####################################
 
-                next_state, reward, color_num, just_count, collision, _ = env.step(action, test=False) # 行動、状態の観測、報酬の一連の処理
+                next_state, reward, color_num, just_count, collision, _ = env.step(action, test=False) # 行動、状態観測、報酬取得
                 next_state = torch.from_numpy(next_state).float()
-                self.model.observe(next_state, reward, collision, reset=False) # モデルの更新
+                # ターゲット更新、モデル更新・同期、リプレイバッファ保存(CustomDoubleDQN.observeを経由してCustomDoubleDQN.batch_observeへ)
+                self.model.observe(next_state, reward, collision, reset=False)
 
                 r_just_count += just_count
                 color_count += color_num
@@ -351,6 +354,7 @@ class ReinforceAgent():
                     if self.recovery and t >= 2:
                         if color_num < 50:
                             action = env.recovery_change_action(test_e, self.lidar_num, action, state, self.model.model) # LiDARの数値が低い方向への行動を避ける
+                            self.model.batch_last_action[0] = action
                         pass
                     #####################################
 
