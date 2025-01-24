@@ -1,4 +1,5 @@
 import matplotlib.pyplot as plt
+import japanize_matplotlib
 import numpy as np
 import os
 import json
@@ -54,8 +55,8 @@ if __name__ == '__main__':
         # グラフの範囲設定
         plt.xlim(-0.9, 0.9)
         plt.ylim(0, 1.8)
-        plt.xticks(np.arange(-0.9, 0.91, 0.3))  # X軸の目盛りを設定
-        plt.yticks(np.arange(0, 1.81, 0.3))  # X軸の目盛りを設定
+        plt.xticks(np.arange(-0.9, 0.91, 0.3), fontsize=14)  # X軸の目盛りを設定
+        plt.yticks(np.arange(0, 1.81, 0.3), fontsize=14)  # X軸の目盛りを設定
 
         # 線の追加
         plt.plot([0.6, 0.9], [0.0, 0.3], linestyle='-', color='orange', linewidth=3) # robot2のゴール
@@ -64,10 +65,10 @@ if __name__ == '__main__':
         plt.plot([-0.6, -0.9], [1.8, 1.5], linestyle='-', color='purple', linewidth=3) # robot0のゴール
 
         # グラフのラベルとタイトル
-        plt.xlabel('X Coordinate [m]')
-        plt.ylabel('Y Coordinate [m]')
+        plt.xlabel('X 座標 [m]', fontsize=16)
+        plt.ylabel('Y 座標 [m]', fontsize=16)
         # plt.title('Robot Trajectories')
-        plt.legend()
+        # plt.legend()
         plt.grid(True)
 
         # 枠線を太くする
