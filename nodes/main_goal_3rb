@@ -354,7 +354,6 @@ class ReinforceAgent():
                     if self.recovery and t >= 2:
                         if color_num < 50:
                             action = env.recovery_change_action(test_e, self.lidar_num, action, state, self.model.model) # LiDARの数値が低い方向への行動を避ける
-                            self.model.batch_last_action[0] = action
                         pass
                     #####################################
 

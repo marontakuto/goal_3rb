@@ -376,7 +376,15 @@ class Env():
                 XYZyaw = f
         
         # 以下テスト用
-        if num in [1, 2, 3, 4, 5, 6]:
+        if 1 <= num <=100:
+            if self.robot_n == 0:
+                XYZyaw = b
+            elif self.robot_n == 1:
+                XYZyaw = h
+            elif self.robot_n == 2:
+                XYZyaw = f
+        
+        elif num in [1, 2]:
             if self.robot_n == 0:
                 XYZyaw = b
             elif self.robot_n == 1:

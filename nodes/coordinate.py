@@ -66,7 +66,7 @@ if __name__ == '__main__':
         # グラフのラベルとタイトル
         plt.xlabel('X Coordinate [m]')
         plt.ylabel('Y Coordinate [m]')
-        plt.title('Robot Trajectories')
+        # plt.title('Robot Trajectories')
         plt.legend()
         plt.grid(True)
 
