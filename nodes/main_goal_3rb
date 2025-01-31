@@ -437,8 +437,8 @@ class ReinforceAgent():
         reward_ave = sum(old_score) / len(old_score)
 
         # ロボットの評価値を算出
-        a = 0.0
-        b = 1.0
+        a = 0.9
+        b = 0.1
         score = a * (100 * r_just_count) + b * (100 * (self.test_step - step_count) / self.test_step)
 
         # テスト平均の出力

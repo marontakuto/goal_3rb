@@ -9,11 +9,11 @@ PRAGMA foreign_keys = OFF;
 
 BEGIN TRANSACTION;
 
-DELETE FROM trial_params WHERE trial_id >= 97;
-DELETE FROM trial_values WHERE trial_id >= 97;
-DELETE FROM trial_user_attributes WHERE trial_id >= 97;
-DELETE FROM trial_system_attributes WHERE trial_id >= 97;
-DELETE FROM trials WHERE trial_id >= 97;
+DELETE FROM trial_params WHERE trial_id >= 36;
+DELETE FROM trial_values WHERE trial_id >= 36;
+DELETE FROM trial_user_attributes WHERE trial_id >= 36;
+DELETE FROM trial_system_attributes WHERE trial_id >= 36;
+DELETE FROM trials WHERE trial_id >= 36;
 
 COMMIT;
 

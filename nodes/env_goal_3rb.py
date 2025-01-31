@@ -694,11 +694,11 @@ class Env():
         bad_action = []
 
         # 方向の定義
-        forward_deg = 40 # 正面とする角度の定義[deg]
+        front_deg = 40 # 正面とする角度の定義[deg]
         lidar_deg = 360 // lidar_num # 1要素間の角度[deg]
-        forward = list(range(0, (forward_deg // 2) // lidar_deg + 1)) # LiDARの正面とする要素番号
-        left = list(range((forward_deg // 2) // lidar_deg + 1, lidar_num // 4 + 1)) # LiDARの前方左側
-        right = list(range(lidar_num * 3 // 4, lidar_num - ((forward_deg // 2) // lidar_deg))) # LiDARの前方右側
+        front = list(range(0, (front_deg // 2) // lidar_deg + 1)) + list(range(lidar_num - ((front_deg // 2) // lidar_deg), lidar_num)) # LiDARの正面とする要素番号
+        left = list(range((front_deg // 2) // lidar_deg + 1, lidar_num // 4 + 1)) # LiDARの前方左側
+        right = list(range(lidar_num * 3 // 4, lidar_num - ((front_deg // 2) // lidar_deg))) # LiDARの前方右側
 
         # LiDARのリストで条件に合う要素を格納したリストをインスタンス化(element_num:要素番号, element_cont:要素内容)
         low_lidar = [element_num for element_num, element_cont in enumerate(self.scan) if element_cont <= threshold]
@@ -708,7 +708,7 @@ class Env():
             bad_action.append(0)
             if action == 0:
                 change_action = True
-        if set(forward) & set(low_lidar) != set():
+        if set(front) & set(low_lidar) != set():
             bad_action.append(1)
             if action == 1:
                 change_action = True
@@ -719,34 +719,30 @@ class Env():
         
         # 行動を変更
         if change_action:
-            if e < mode_change_episode: # LiDAR値による行動の変更
+            if len(bad_action) == 3: # 全方向のLiDAR値が低い場合はランダムな方向に旋回
+                    action = 3 # random.choice([3, 4])
+            elif len(bad_action) == 2: # 2方向のLiDAR値が低い場合は残りの方向へ
+                action = (set([0, 1, 2]) - set(bad_action)).pop()
+            elif e < mode_change_episode: # LiDAR値による行動の変更
                 # 各方向のLiDAR値
                 left_scan = self.scan[left[0]:left[-1] + 1]
-                forward_scan = self.scan[0:left[0]] + self.scan[right[-1] + 1:lidar_num]
+                front_scan = self.scan[0:left[0]] + self.scan[right[-1] + 1:lidar_num]
                 right_scan = self.scan[right[0]:right[-1] + 1]
-                scan_list = [left_scan, forward_scan, right_scan]
-                if len(bad_action) == 3: # 全方向のLiDAR値が低い場合はランダムな方向に旋回
-                    action = 3 # random.choice([3, 4])
-                elif len(bad_action) == 2: # 2方向のLiDAR値が低い場合は残りの方向へ
-                    action = (set([0, 1, 2]) - set(bad_action)).pop()
-                elif len(bad_action) == 1: # 1方向のLiDAR値が低い場合は残りのLiDAR値が大きい方向へ
-                    action_candidate = list(set([0, 1, 2]) - set(bad_action))
-                    if max(scan_list[action_candidate[0]]) > max(scan_list[action_candidate[1]]):
-                        action = action_candidate[0]
-                    else:
-                        action = action_candidate[1]
+                scan_list = [left_scan, front_scan, right_scan]
+                # 残りのLiDAR値が大きい方向へ
+                action_candidate = list(set([0, 1, 2]) - set(bad_action))
+                if max(scan_list[action_candidate[0]]) > max(scan_list[action_candidate[1]]):
+                    action = action_candidate[0]
+                else:
+                    action = action_candidate[1]
             else: # Q値による行動の変更
                 net_out = model.forward(state.unsqueeze(0).to('cuda:0')) # ネットワークの出力
                 q_values = net_out.q_values.cpu().detach().numpy().tolist()[0] # Q値
-                if len(bad_action) == 3: # 全方向のLiDAR値が低い場合はランダムな方向に旋回
-                    action = 3 # random.choice([3, 4])
-                elif len(bad_action) == 2: # 2方向のLiDAR値が低い場合は残りの方向へ
-                    action = (set([0, 1, 2]) - set(bad_action)).pop()
-                elif len(bad_action) == 1: # 1方向のLiDAR値が低い場合は残りのQ値が大きい方向へ
-                    action_candidate = list(set([0, 1, 2]) - set(bad_action))
-                    if q_values[action_candidate[0]] > q_values[action_candidate[1]]:
-                        action = action_candidate[0]
-                    else:
-                        action = action_candidate[1]
+                # 残りのQ値が大きい方向へ
+                action_candidate = list(set([0, 1, 2]) - set(bad_action))
+                if q_values[action_candidate[0]] > q_values[action_candidate[1]]:
+                    action = action_candidate[0]
+                else:
+                    action = action_candidate[1]
 
         return action
