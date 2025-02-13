@@ -44,6 +44,11 @@ class Env():
         self.pub_cmd_vel = rospy.Publisher('cmd_vel', Twist, queue_size=5)
         self.reset_proxy = rospy.ServiceProxy('gazebo/reset_simulation', Empty)
 
+        if self.mode=='sim':
+            self.sub_img=rospy.Subscriber('usb_cam/image_raw',Image,self.pass_img,queue_size=10) #これがないと上手く画像取得できない(原因不明) 実機はなし
+        else:
+            self.sub_img=rospy.Subscriber('usb_cam/image_raw/compressed',CompressedImage,self.pass_img,queue_size=10) #これがないと上手く画像取得できない(原因不明) 実機用
+
         # カメラ画像
         self.mask_switch = mask_switch
         self.display_image_normal = display_image_normal
@@ -78,6 +83,9 @@ class Env():
         self.previous_goal = None
 
         self.path = []  # 座標を記録するリスト
+    
+    def pass_img(self, img):#画像正常取得用callback
+        pass
 
     def get_lidar(self, retake=False): # lidar情報の取得
         if retake:
@@ -138,10 +146,10 @@ class Env():
             
             if self.mode == 'sim':
                 img = ros_numpy.numpify(img)
-                img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB) # カラー画像(BGR)
             else:
                 img = np.frombuffer(img.data, np.uint8)
                 img = cv2.imdecode(img, cv2.IMREAD_COLOR) # カラー画像(BGR)
+                img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB) # RGB
             
             img = cv2.resize(img, (self.cam_width, self.cam_height)) # 取得した画像をcam_width×cam_height[pixel]に変更
 
@@ -511,7 +519,7 @@ class Env():
         goal_num = 0
 
         # 画像をHSV色空間に変換
-        img_hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+        img_hsv = cv2.cvtColor(img, cv2.COLOR_RGB2HSV)
 
         # 色範囲を定義(HSVの値)
         color_ranges = {
@@ -542,6 +550,8 @@ class Env():
         return img, goal_num
     
     def display_image(self, img, name): # カメラ画像の出力
+
+        img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
 
         # アスペクト比を維持してリサイズ
         magnification = 10 # 出力倍率

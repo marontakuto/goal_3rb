@@ -43,7 +43,7 @@ class ReinforceAgent():
         self.cam_height = 27 # カメラ画像の縦[pixel]
         
         self.exploration = 'd_egreedy' # d_egreedy(decay_epsilon_greedy) or c_egreedy(constant_epsilon_greedy)
-        self.lidar_num = 72 # DQNに入力するlidarの方向数(MAX: 360)
+        self.lidar_num = 36 # DQNに入力するlidarの方向数(MAX: 360)
         self.action_size = 5 # 行動の種類数
         self.episode = 45 # 45
         self.eval_episode = 6 # 6
@@ -64,22 +64,6 @@ class ReinforceAgent():
         self.teleport = True # 衝突時は空いたスペースに再配置するか否か
         self.all_episode_test = False # すべてのエピソードをテスト
         self.robot_coordinate_recode = False # テストでのロボットの座標の記録
-
-        # ### オプション有無の実験 ###
-        # if trials >= 9:
-        #     self.action_size = 6
-        #     self.recovery = True
-        # elif trials >= 6:
-        #     self.action_size = 4
-        #     self.recovery = True
-        # elif trials >= 3:
-        #     self.action_size = 5
-        #     self.recovery = True
-        # else:
-        #     self.action_size = 6
-        #     self.recovery = True
-        # ############################
-
         #######################################################################################
 
         # ロボットの番号割振り(launchファイルの「<param name="robot_num"  value="ここ"/>」から値を参照)
@@ -92,29 +76,16 @@ class ReinforceAgent():
         # ネットワークへの入力数の定義
         self.n_added_input = 0
         if self.input_cam: # カメラ画像
-            if network in ['CNN', 'DCNN']:
-                self.n_input_channels = 3 * (self.cam_past_step + 1)
-            elif network == 'MLP':
-                self.n_input = (self.cam_width * self.cam_height * 3) * (self.cam_past_step + 1)
+            self.n_input_channels = 3 * (self.cam_past_step + 1)
         if self.input_lidar: # LiDAR
             self.n_added_input = self.lidar_num * (self.lidar_past_step + 1)
         
         # ネットワークモデルを定義
-        if network == 'CNN':
-            self.q_func = net_goal_3rb.Q_Func_Optuna(conv_num,mid_layer_num,mid_units1,
-                mid_units2,mid_units3,cnv_act,ful_act,
-                n_actions=self.action_size, n_input_channels=self.n_input_channels, 
-                n_added_input=self.n_added_input, img_width=self.cam_width, img_height=self.cam_height)
-        elif network == 'DCNN':
-            self.q_func = net_goal_3rb.Dueling_Q_Func_Optuna(
-                conv_num, mid_layer_num, mid_units1, mid_units2, mid_units3, cnv_act, ful_act,
-                n_actions=self.action_size, n_input_channels=self.n_input_channels, 
-                n_added_input=self.n_added_input, img_width=self.cam_width, img_height=self.cam_height
-            )
-        elif network == 'MLP':
-            self.q_func = net_goal_3rb.MLP_Optuna(
-                mid_layer_num, mid_units1, mid_units2, mid_units3, ful_act, 
-                n_actions=self.action_size, n_input=self.n_input, n_added_input=self.n_added_input)
+        self.q_func = net_goal_3rb.Dueling_Q_Func_Optuna(
+            conv_pool, mid_layer_num, mid_units1, mid_units2, mid_units3, cnv_act, ful_act,
+            n_actions=self.action_size, n_input_channels=self.n_input_channels, 
+            n_added_input=self.n_added_input, img_width=self.cam_width, img_height=self.cam_height
+        )
 
         # 最適化アルゴリズムの設定
         if optimizer == 'SGD':
@@ -630,8 +601,7 @@ if __name__ == '__main__':
             time.sleep(0.1)
 
         # 変数にデータを格納
-        network = get_value_by_name('network')
-        conv_num = get_value_by_name('conv_num')
+        conv_pool = get_value_by_name('conv_pool')
         mid_layer_num = get_value_by_name('mid_layer_num')
         mid_units1 = get_value_by_name('mid_units1')
         mid_units2 = get_value_by_name('mid_units2')

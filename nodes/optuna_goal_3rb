@@ -25,7 +25,7 @@ class Select: # Optunaのパラメータを管理するデータベースを操�
     def __init__(self):
         # データベースで扱う変数名
         self.parameters = [
-            'network', 'conv_num', 'mid_layer_num', 'mid_units1', 'mid_units2', 
+            'conv_pool', 'mid_layer_num', 'mid_units1', 'mid_units2', 
             'mid_units3', 'cnv_act', 'ful_act', 'optimizer', 'batch_size', 
             'r_collision', 'r_just', 'r_near', 'r_goal', 'r_cost', 'r_passive', 
             'distance', 'past_step', 'trials', 'trial_size', 'start_trial'
@@ -64,31 +64,27 @@ class Select: # Optunaのパラメータを管理するデータベースを操�
 
     def choice_param(self, trial, trials, trial_size, start_trial): # Optunaのパラメータ選択
 
-        network = 'DCNN' # CNN or DCNN or MLP
-        
-        if network in ['CNN', 'DCNN']:
-            #畳み込み層,プーリング層の組み合わせを選択
-            conv_num = trial.suggest_categorical('conv_num', [1, 2, 3])
+        #畳み込み層,プーリング層の組み合わせを選択
+        conv_pool = trial.suggest_categorical('conv_pool', [1, 2, 3, 4])
 
         # 中間層数とユニット数の選択
         mid_layer_num = trial.suggest_categorical('mid_layer_num', [1, 2, 3])
         if mid_layer_num == 1:
-            mid_units1 = int(trial.suggest_float("mid_units1", 50, 800, step=1))
+            mid_units1 = int(trial.suggest_float("mid_units1", 300, 800, step=1))
             mid_units2 = None
             mid_units3 = None
         elif mid_layer_num == 2:
             mid_units1 = int(trial.suggest_float("mid_units1", 300, 800, step=1))
-            mid_units2 = int(trial.suggest_float("mid_units2", 50, 600, step=1))
+            mid_units2 = int(trial.suggest_float("mid_units2", 50, 400, step=1))
             mid_units3 = None
         elif mid_layer_num == 3:
             mid_units1 = int(trial.suggest_float("mid_units1", 300, 800, step=1))
             mid_units3 = int(trial.suggest_float("mid_units3", 300, 800, step=1))
-            mid_units2 = int(trial.suggest_float("mid_units2", 50, 500, step=1))
+            mid_units2 = int(trial.suggest_float("mid_units2", 50, 400, step=1))
 
         # fully-connected layerとconvolutionの活性化関数の選択
-        if network in ['CNN', 'DCNN']:
-            # cnv_act_name = trial.suggest_categorical('activation_cnv', ['F.relu', 'F.elu', 'F.selu', 'F.l_relu'])
-            cnv_act = 'F.relu'
+        # cnv_act_name = trial.suggest_categorical('activation_cnv', ['F.relu', 'F.elu', 'F.selu', 'F.l_relu'])
+        cnv_act = 'F.relu'
         # ful_act_name = trial.suggest_categorical('activation_ful', ['F.relu', 'F.elu', 'F.selu', 'F.l_relu'])
         ful_act = 'F.relu'
 
@@ -126,9 +122,9 @@ class Select: # Optunaのパラメータを管理するデータベースを操�
         else:
             r_passive = 0
 
-        # リカバリー方策のしきい値(距離[m])
+        # リカバリー方策のしきい値(距離[mm])
         if trial.suggest_categorical('distance_exis', [True, False]):
-            distance = trial.suggest_float("distance", 0.16, 0.3, step=0.001)
+            distance = trial.suggest_float("distance", 160, 300, step=1)
         else:
             distance = 0.0
         
@@ -450,19 +446,19 @@ if __name__ == '__main__':
     optuna_db_path = 'sqlite:///' + os.path.dirname(os.path.realpath(__file__)) + '/result/optuna.db' # データベースの保存場所
 
     ### Optunaの設定 ###########
-    trial_size = 65 # 実行するトライアル数
+    trial_size = 30 # 実行するトライアル数
     save_study = True # Optunaの内容をデータベースに保存
     load_study = False # 前回のOptunaの内容を引き継ぐ
     shutdown = True # プログラム終了時にPCの電源を落とすか否か
     fix = False # 初期トライアルのパラメータ値の固定(study.optimizeの直前でstudy.enqueue_trialを用いて追加してください)
     choice_param_only = False # 指定したパラメータのみを用いる
-    trial_size_choice = 5 # 指定したパラメータでの試行回数(1つの組み合わせあたり)
+    trial_size_choice = 1 # 指定したパラメータでの試行回数(1つの組み合わせあたり)
 
     # 指定するパラメータの設定
     choice_params = [
-        {'conv_num': 3, 'mid_layer_num': 3, 'mid_units1': 524.0, 'mid_units3': 471.0, 'mid_units2': 222.0, 'r_collision': 1720.0, 
-         'r_just_exis': True, 'r_just': 0.47, 'r_near_exis': False, 'r_goal_exis': True, 'r_goal': 1280.0, 'r_cost_exis': True, 
-         'r_cost': 11.0, 'r_passive_exis': True, 'r_passive': 100.0, 'distance_exis': False, 'past_step': 1}
+        {'conv_pool': 4, 'mid_layer_num': 3, 'mid_units1': 461.0, 'mid_units3': 351.0, 'mid_units2': 200.0, 'r_collision': 1200.0, 
+         'r_just_exis': True, 'r_just': 0.32, 'r_near_exis': False, 'r_goal_exis': False, 'r_cost_exis': True, 'r_cost': 4.0, 
+         'r_passive_exis': True, 'r_passive': 43.0, 'distance_exis': True, 'distance': 0.29300000000000004, 'past_step': 2}
     ]
     
     """ 上位群の割合を減少させるTPE(initial_gamma: 最初の上位群の割合, 
