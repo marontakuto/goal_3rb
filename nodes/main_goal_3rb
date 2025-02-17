@@ -268,6 +268,8 @@ class ReinforceAgent():
         # テストに用いるエピソードモデルの選択
         if self.all_episode_test:
             test_episodes = list(range(1, self.episode + 1)) # すべてのエピソードをテスト
+        elif self.episode < test_num:
+            test_episodes = [self.episode for _ in range(test_num)] # 最後のエピソードをtest_num回テスト
         else:
             test_episodes = list(range(self.episode - test_num + 1, self.episode + 1)) # 最後のtest_num個のエピソードをテスト
 
@@ -387,7 +389,7 @@ class ReinforceAgent():
                                 flag_last = True
                             env.coordinate_recode(flag_last)
 
-                        # 他ロボットが右のエリアにいることを確認することで同期を取る
+                        # 他ロボットが上のエリアにいることを確認することで同期を取る
                         if self.mode == 'sim':
                             env.set_robot(105) # フィールド外の上側に配置
                             sync = False
