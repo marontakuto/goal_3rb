@@ -29,7 +29,6 @@ class ReinforceAgent():
 
         ########変更パラメータ#################################################################
         self.mode = 'sim' # sim or real
-        self.choice_model = False # dirPath/load_model/robot_n でテスト
 
         self.save_rbuf = False # リプレイバッファを保存するか(モデルは必ず保存されます)
         self.load_model = False # 保存した重みを適用するか
@@ -240,7 +239,7 @@ class ReinforceAgent():
             self.model.save(self.dirPath + '/TRIAL' + str(trials) + '/episode' + str(e) + '/robot_' + str(self.robot_n)) # モデルの保存
             
             # エピソードごとの同期(他ロボットが右のエリアにいることを確認することで同期を取る)
-            if e != self.episode:
+            if e != self.episode and self.mode == 'sim':
                 env.set_robot(102) # フィールド外の右側に配置
                 sync = False
                 while sync == False:

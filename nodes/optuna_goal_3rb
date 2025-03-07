@@ -463,9 +463,9 @@ if __name__ == '__main__':
     
     """ 上位群の割合を減少させるTPE(initial_gamma: 最初の上位群の割合, 
         final_gamma: 減少後の上位群の割合, stop_trial: 割合減少を止めるトライアル, random_trials: ランダムサーチのトライアル数) """
-    sampler = DynamicGammaTPE(initial_gamma=0.7, final_gamma=0.1, stop_trial=50, random_trials=10)
-    gamma = 0.1 # TPESamplerの上位群の割合
-    # sampler = TPESampler(gamma=gamma_set, n_startup_trials=10)
+    # sampler = DynamicGammaTPE(initial_gamma=0.7, final_gamma=0.1, stop_trial=50, random_trials=10)
+    gamma = 0.5 # TPESamplerの上位群の割合
+    sampler = TPESampler(gamma=gamma_set, n_startup_trials=10)
     ############################
     
     if choice_param_only:
