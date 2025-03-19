@@ -526,6 +526,9 @@ if __name__ == '__main__':
     # ベストパラメータ・スコアの表示
     print(f"\nbest_params={study.best_params}")
     print(f"\nbest_value={study.best_value}\n")
+
+    # 最後のグラフ作成
+    visual.create_graph_single(start_trial + trial_size - 1)
     
     # ROSログファイルの削除(ROSの通信遅延を解消できる)
     os.system('rosclean purge -y')

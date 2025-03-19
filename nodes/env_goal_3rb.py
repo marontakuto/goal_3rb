@@ -308,12 +308,14 @@ class Env():
         if test and collision:
             self.stop()
             time.sleep(0.5)
-
-        if not test: # テスト時でないときの処理
-            if (collision or goal) and not self.teleport:
+        
+        if (collision or goal) and not test:
+            if self.mode == 'real' or not self.teleport:
                 self.restart() # 進行方向への向き直し
-            elif collision or goal:
+            else:
                 self.relocation() # 空いているエリアへの再配置
+        elif (collision or goal) and test:
+            self.stop()
         
         return np.array(state_list), reward, color_num, just_count, collision, goal
 
